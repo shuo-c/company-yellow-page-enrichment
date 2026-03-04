@@ -5,9 +5,16 @@ description: Batch-translate Yellow Pages company text fields (for example intro
 
 # Yellow Pages Translation Assistant
 
-Execute an end-to-end translation pipeline for company profile fields.
+Execute an end-to-end translation pipeline for company profile fields, and fetch single-company full detail snapshots from Supabase REST GET into JSON/CSV with optional translated value columns.
 
 ## Pipeline Stages
+
+0. **single-company detail fetch (optional)**
+   - Run `scripts/fetch_company_detail.py`.
+   - Use GET to pull `companies` with broad nested relations (`companies_i18n`, `industries`, `services`, `companies_address`, `companies_support`).
+   - Save JSON as `company_<company_id>_detail.json`.
+   - Save CSV as `company_<company_id>_detail.csv`.
+   - Optionally add a translated column (default `value_zh-CN`).
 
 1. **fetch/split**
    - Read records from `jsonl/csv/json`.
@@ -38,6 +45,7 @@ Execute an end-to-end translation pipeline for company profile fields.
 ## Execution Contract
 
 Run in this order by default:
+0) Optional single-record pull: `scripts/fetch_company_detail.py`
 1) `scripts/split_batches.py`
 2) `scripts/translate_batch.py`
 3) `scripts/review_batch.py`
@@ -65,6 +73,8 @@ Common optional keys:
 - `GLOSSARY_FILE`
 - `NO_TRANSLATE_FIELDS`
 - `RESUME` (default `true`)
+- `COMPANY_ID` / CLI `--company-id` (for single-company detail fetch)
+- `TRANSLATE_TO` / CLI `--translate-to` (for translated CSV value column)
 
 ## Guardrails
 
