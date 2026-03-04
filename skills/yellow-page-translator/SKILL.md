@@ -82,6 +82,7 @@ Common optional keys:
 - Never fabricate qualifications, awards, metrics, or business claims.
 - Preserve semantic equivalence; improve fluency only.
 - Do not write back to DB unless user explicitly enables writeback and provides approved API contract.
+- Never delete or modify existing `.env` files by default. Only change or remove `.env` files when the user explicitly asks for that action.
 
 ## Failure & Resume Policy
 
