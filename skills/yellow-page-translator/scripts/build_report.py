@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,7 +34,15 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate markdown summary report")
     p.add_argument("--out-dir", default="out")
     p.add_argument("--target-lang", required=True)
+    p.add_argument("--cleanup-intermediate", action="store_true", default=True)
+    p.add_argument("--no-cleanup-intermediate", action="store_false", dest="cleanup_intermediate")
     return p.parse_args()
+
+
+def all_todos_done(todos: list[dict]) -> bool:
+    if not todos:
+        return False
+    return all(t.get("status") == "done" for t in todos)
 
 
 def main() -> None:
@@ -73,7 +82,17 @@ def main() -> None:
     report_file = report_dir / "summary.md"
     report_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    cleaned = False
+    if args.cleanup_intermediate and all_todos_done(todos):
+        batches_dir = out_dir / "batches"
+        if batches_dir.exists():
+            shutil.rmtree(batches_dir)
+        if todo_dir.exists():
+            shutil.rmtree(todo_dir)
+        cleaned = True
+
     print(f"summary={report_file}")
+    print(f"cleanup_intermediate={cleaned}")
 
 
 if __name__ == "__main__":

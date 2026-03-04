@@ -27,11 +27,13 @@ Execute an end-to-end translation pipeline for company profile fields.
 
 4. **merge**
    - Merge with priority: `reviewed > translated > input`.
+   - Default final output format is CSV.
    - Write `out/final/companies_i18n.<target_lang>.<ext>`.
 
 5. **report**
    - Generate `out/report/summary.md`.
    - Include done/pending/error counts and error reasons.
+   - When all todo batches are `done`, delete intermediate folders (`out/batches`, `out/todo`) by default.
 
 ## Execution Contract
 

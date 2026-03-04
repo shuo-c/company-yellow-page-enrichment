@@ -55,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Merge batches to final output")
     p.add_argument("--out-dir", default="out")
     p.add_argument("--target-lang", required=True)
-    p.add_argument("--output-format", choices=["jsonl", "csv"], default="jsonl")
+    p.add_argument("--output-format", choices=["jsonl", "csv"], default="csv")
     return p.parse_args()
 
 
