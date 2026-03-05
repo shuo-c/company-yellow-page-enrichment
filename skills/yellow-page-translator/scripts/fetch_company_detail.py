@@ -113,13 +113,51 @@ def flatten_json(obj: object, prefix: str = "") -> list[tuple[str, str]]:
     return rows
 
 
-def maybe_translate_text(text: str, target_lang: str, cache: dict[str, str]) -> str:
-    if not text or text in cache:
-        return cache.get(text, text)
+def should_translate_field(field: str, value: str) -> bool:
+    """Field-level guardrails: skip identifiers, lang codes, company names, and address-like fields."""
+    f = field.lower()
+
+    # IDs / codes
+    if f.endswith("industry_id") or ".industry_id" in f:
+        return False
+    if f.endswith("lang_code") or ".lang_code" in f:
+        return False
+    if f.endswith("company_id") or ".company_id" in f:
+        return False
+
+    # Company name should remain source-language
+    if "companies_i18n" in f and f.endswith(".name"):
+        return False
+    if "company_name" in f:
+        return False
+
+    # Address-related fields should not be translated
+    address_tokens = ["address", "city", "state", "province", "postcode", "postal", "zip", "country", "street"]
+    if any(tok in f for tok in address_tokens):
+        return False
+
+    # Non-text-like / obvious literals
+    v = value.strip()
+    if not v:
+        return False
+    if v.replace(".", "", 1).isdigit():
+        return False
+
+    return True
+
+
+def maybe_translate_text(field: str, text: str, target_lang: str, cache: dict[str, str]) -> str:
+    key = f"{field}\n{text}"
+    if not text or key in cache:
+        return cache.get(key, text)
+
+    if not should_translate_field(field, text):
+        cache[key] = text
+        return text
 
     lower = text.lower()
     if text.startswith(("http://", "https://")) or "@" in text or lower in {"true", "false"}:
-        cache[text] = text
+        cache[key] = text
         return text
 
     try:
@@ -132,10 +170,10 @@ def maybe_translate_text(text: str, target_lang: str, cache: dict[str, str]) -> 
             body = resp.read().decode("utf-8", errors="replace")
         data = json.loads(body)
         translated = "".join(seg[0] for seg in data[0] if seg and seg[0])
-        cache[text] = translated or text
-        return cache[text]
+        cache[key] = translated or text
+        return cache[key]
     except Exception:
-        cache[text] = text
+        cache[key] = text
         return text
 
 
@@ -149,7 +187,7 @@ def write_csv(detail: dict, csv_path: Path, translate_to: str = "") -> None:
         if do_translate:
             writer.writerow(["field", "value", f"value_{translate_to}"])
             for field, value in flat_rows:
-                writer.writerow([field, value, maybe_translate_text(value, translate_to, cache)])
+                writer.writerow([field, value, maybe_translate_text(field, value, translate_to, cache)])
         else:
             writer.writerow(["field", "value"])
             for field, value in flat_rows:

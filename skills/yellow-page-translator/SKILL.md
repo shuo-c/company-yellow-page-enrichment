@@ -78,7 +78,9 @@ Common optional keys:
 
 ## Guardrails
 
-- Never translate protected fields (for example company name, address, phone, email, website/url, legal identifiers).
+- Never translate company names (for example `companies_i18n.name`).
+- Never translate identifier/code fields (for example `industry_id`, `company_id`, `lang_code`, legal identifiers).
+- Never translate address-related fields (for example address/city/state/province/postcode/zip/country/street).
 - Never fabricate qualifications, awards, metrics, or business claims.
 - Preserve semantic equivalence; improve fluency only.
 - Do not write back to DB unless user explicitly enables writeback and provides approved API contract.
