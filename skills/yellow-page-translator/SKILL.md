@@ -52,6 +52,12 @@ Run in this order by default:
 4) `scripts/merge_final.py`
 5) `scripts/build_report.py`
 
+For API-based company detail export (single or batch), use detailed mode by default:
+- Use broad GET select with nested relations (`companies_i18n`, `industries/industries_i18n/services/services_i18n`, `companies_address`, `companies_support`).
+- Flatten nested JSON into one-row-per-company CSV with full field paths as column names.
+- Never output a reduced/minimal CSV unless user explicitly asks for a slim schema.
+- Prefer `scripts/export_companies_detail_csv.py` for multi-company detailed CSV exports.
+
 Support:
 - stage-only execution (translate-only/review-only/merge-only)
 - resume mode (skip done, process pending/error)
