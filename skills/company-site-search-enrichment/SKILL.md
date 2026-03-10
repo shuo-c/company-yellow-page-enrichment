@@ -14,8 +14,8 @@ Extract structured company records from search + official websites for yellow pa
    - Valid examples: `Sydney IT company`, `Melbourne accounting company`.
    - Reject keywords without `company`.
 
-2. **Collect candidate websites**
-   - Use search results to collect title/url/snippet/rank.
+2. **Collect candidate websites (Playwright + Google)**
+   - Use Playwright-driven Google search to collect title/url/rank.
    - Deduplicate by domain.
    - Prefer official company domains and homepage/about/services/contact pages.
    - De-prioritize job boards, review sites, social profiles, and aggregators.
@@ -120,7 +120,7 @@ Always report:
 ## Script Entrypoints (v0.1)
 
 - `scripts/query_builder.py`
-- `scripts/search_collector.py` (requires `BRAVE_API_KEY`)
+- `scripts/search_collector.py` (Playwright + Google search; no API key required)
 - `scripts/site_extractor.py`
 - `scripts/normalize_and_validate.py`
 - `scripts/export_records.py`
@@ -129,7 +129,7 @@ Always report:
 Run example:
 
 ```bash
-export BRAVE_API_KEY=...
+bash scripts/setup_playwright.sh
 python3 scripts/run_pipeline.py \
   --location Sydney \
   --seed-topic IT \
@@ -149,4 +149,17 @@ Outputs:
 - `<out-dir>/summary.md`
 - `<out-dir>/logos/*` (downloaded logo files)
 - `<out-dir>/work/*.jsonl` (intermediate files)
+
+## Migration / Environment Declaration
+
+For cross-machine skill migration, declare and install runtime exactly:
+
+- Python dependency file: `requirements.txt` (includes `playwright`)
+- Setup script: `scripts/setup_playwright.sh`
+- Browser runtime install: `python3 -m playwright install chromium`
+
+Required migration steps:
+1. Copy/install the skill folder.
+2. Run `bash scripts/setup_playwright.sh`.
+3. Verify with a small test run (`--max-keywords 1 --per-keyword 3`).
 
