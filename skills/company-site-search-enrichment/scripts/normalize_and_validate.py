@@ -6,6 +6,8 @@ import json
 import re
 from pathlib import Path
 
+from logo_judge_agent import LogoJudgeAgent
+
 
 def hashtags_from_text(text: str, scope: str) -> list[str]:
     t = (text + " " + scope).lower()
@@ -41,6 +43,7 @@ def main() -> int:
     valid.parent.mkdir(parents=True, exist_ok=True)
 
     seen_domains = set()
+    judge = LogoJudgeAgent()
     ok = sk = 0
     with Path(args.infile).open("r", encoding="utf-8") as src, valid.open("w", encoding="utf-8") as v, skipped.open("w", encoding="utf-8") as s:
         for line in src:
@@ -62,7 +65,13 @@ def main() -> int:
                 reason = "missing_logo_file"
             elif not Path(saved_logo_path).exists():
                 reason = "missing_logo_file"
-            elif not desc:
+            else:
+                jr = judge.judge(saved_logo_path)
+                if not jr.passed:
+                    reason = jr.reason
+                    r["logo_quality_score"] = jr.score
+
+            if not reason and not desc:
                 reason = "missing_description"
 
             if reason:
@@ -78,6 +87,7 @@ def main() -> int:
             r["business_scope_summary"] = clean(r.get("business_scope_summary", ""))
             r["hashtags"] = hashtags_from_text(desc, r["business_scope_summary"])
             r["extraction_status"] = "valid"
+            r["logo_quality_score"] = r.get("logo_quality_score", 0.8)
             r["extraction_confidence"] = 0.85 if r["hashtags"] else 0.75
             v.write(json.dumps(r, ensure_ascii=False) + "\n")
             ok += 1
