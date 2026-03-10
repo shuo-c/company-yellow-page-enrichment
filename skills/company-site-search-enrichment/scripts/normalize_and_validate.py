@@ -79,9 +79,20 @@ def main() -> int:
                 reason = "missing_description"
 
             if reason:
-                r["extraction_status"] = "skipped"
-                r["skip_reason"] = reason
-                s.write(json.dumps(r, ensure_ascii=False) + "\n")
+                # Enforce one-to-one mapping: rejected records must not retain logo files.
+                if saved_logo_path and Path(saved_logo_path).exists():
+                    try:
+                        Path(saved_logo_path).unlink()
+                    except Exception:
+                        pass
+
+                skipped_row = {
+                    "official_website": site,
+                    "source_search_keyword": r.get("source_search_keyword", ""),
+                    "skip_reason": reason,
+                    "extraction_status": "skipped",
+                }
+                s.write(json.dumps(skipped_row, ensure_ascii=False) + "\n")
                 sk += 1
                 continue
 
