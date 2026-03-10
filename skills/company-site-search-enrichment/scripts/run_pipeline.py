@@ -20,7 +20,10 @@ def main() -> int:
     p.add_argument("--location", required=True)
     p.add_argument("--seed-topic", required=True)
     p.add_argument("--max-keywords", type=int, default=8)
-    p.add_argument("--per-keyword", type=int, default=10)
+    p.add_argument("--batch-size", type=int, default=10, help="candidate rows per keyword batch")
+    p.add_argument("--target-candidates", type=int, default=50, help="target candidate domains before extraction")
+    p.add_argument("--workers", type=int, default=5, help="parallel extractor workers")
+    p.add_argument("--per-keyword", type=int, default=None, help="deprecated alias of --batch-size")
     default_out_dir = os.getenv("ENRICHMENT_OUTPUT_DIR", "/Users/derekchen/Desktop/company-yellow-page-output")
     p.add_argument("--out-dir", default=default_out_dir)
     p.add_argument("--name", default="company_enrichment")
@@ -39,9 +42,35 @@ def main() -> int:
     logos_dir = out / "logos"
 
     py = sys.executable
+    per_keyword = args.per_keyword if args.per_keyword is not None else args.batch_size
+
     run([py, str(root / "query_builder.py"), "--location", args.location, "--seed-topic", args.seed_topic, "--max-keywords", str(args.max_keywords), "--out", str(keywords)])
-    run([py, str(root / "search_collector.py"), "--keywords", str(keywords), "--out", str(cands), "--per-keyword", str(args.per_keyword)])
-    run([py, str(root / "site_extractor.py"), "--candidates", str(cands), "--out", str(raw), "--logos-dir", str(logos_dir)])
+    run([
+        py,
+        str(root / "search_collector.py"),
+        "--keywords",
+        str(keywords),
+        "--out",
+        str(cands),
+        "--per-keyword",
+        str(per_keyword),
+        "--keyword-workers",
+        str(args.workers),
+        "--target-candidates",
+        str(args.target_candidates),
+    ])
+    run([
+        py,
+        str(root / "site_extractor.py"),
+        "--candidates",
+        str(cands),
+        "--out",
+        str(raw),
+        "--logos-dir",
+        str(logos_dir),
+        "--workers",
+        str(args.workers),
+    ])
     run([py, str(root / "normalize_and_validate.py"), "--infile", str(raw), "--out-valid", str(valid), "--out-skipped", str(skipped)])
     run([py, str(root / "export_records.py"), "--valid-jsonl", str(valid), "--skipped-jsonl", str(skipped), "--out-dir", str(out), "--name", args.name])
 

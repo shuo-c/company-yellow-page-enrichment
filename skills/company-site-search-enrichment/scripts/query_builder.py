@@ -10,15 +10,30 @@ RELATED = {
     "accounting": ["tax", "bookkeeping", "financial advisory", "audit"],
     "marketing": ["digital marketing", "seo", "branding", "advertising"],
     "construction": ["building", "civil", "contractor", "renovation"],
+    "builder": ["home builder", "custom builder", "residential builder", "construction company", "renovation company"],
 }
+
+GENERIC_EXPANSIONS = [
+    "services",
+    "business",
+    "provider",
+    "contractor",
+    "near me",
+    "best",
+]
 
 
 def build_keywords(location: str, seed_topic: str, max_keywords: int) -> list[str]:
     topic = seed_topic.strip().lower()
     base = [f"{location} {seed_topic} company"]
+
     expansions = RELATED.get(topic, [])
+    if not expansions:
+        expansions = [f"{seed_topic} {x}" for x in GENERIC_EXPANSIONS]
+
     for e in expansions:
         base.append(f"{location} {e} company")
+
     uniq: list[str] = []
     for k in base:
         if "company" not in k.lower():

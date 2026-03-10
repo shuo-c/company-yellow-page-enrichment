@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import re
 import time
@@ -198,33 +199,42 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Collect candidate company websites from Google via Playwright")
     p.add_argument("--keywords", required=True, help="keywords JSON from query_builder")
     p.add_argument("--out", required=True, help="output JSONL")
-    p.add_argument("--per-keyword", type=int, default=10)
+    p.add_argument("--per-keyword", type=int, default=10, help="results per keyword batch")
     p.add_argument("--delay-ms", type=int, default=1500)
     p.add_argument("--retries", type=int, default=2)
+    p.add_argument("--keyword-workers", type=int, default=5, help="parallel keyword workers")
+    p.add_argument("--target-candidates", type=int, default=0, help="stop once this many unique domains are collected (0 = no limit)")
     args = p.parse_args()
 
     kws = json.loads(Path(args.keywords).read_text(encoding="utf-8")).get("keywords", [])
     seen = set()
     rows = []
 
-    for kw in kws:
+    def collect_one_keyword(kw: str) -> list[dict]:
         one: list[dict] = []
         for attempt in range(args.retries + 1):
             one = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
             if one:
                 break
             time.sleep(1.0 + attempt)
-
         if not one:
             one = collect_with_duckduckgo(kw, args.per_keyword)
+        return one
 
-        for r in one:
-            d = r.get("domain", "")
-            if not d or d in seen:
-                continue
-            seen.add(d)
-            rows.append(r)
-        time.sleep(0.5)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.keyword_workers)) as ex:
+        fut_to_kw = {ex.submit(collect_one_keyword, kw): kw for kw in kws}
+        for fut in concurrent.futures.as_completed(fut_to_kw):
+            one = fut.result()
+            for r in one:
+                d = r.get("domain", "")
+                if not d or d in seen:
+                    continue
+                seen.add(d)
+                rows.append(r)
+                if args.target_candidates > 0 and len(rows) >= args.target_candidates:
+                    break
+            if args.target_candidates > 0 and len(rows) >= args.target_candidates:
+                break
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

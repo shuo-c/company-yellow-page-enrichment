@@ -149,9 +149,16 @@ python3 scripts/run_pipeline.py \
   --location Sydney \
   --seed-topic IT \
   --max-keywords 8 \
-  --per-keyword 10 \
+  --batch-size 10 \
+  --target-candidates 50 \
+  --workers 5 \
   --name sydney_it_companies
 ```
+
+Notes:
+- `--batch-size 10` means **10 candidates per keyword batch**, not a global hard cap.
+- `--workers 5` means 5 parallel workers for collection/extraction.
+- Use `--target-candidates` to control overall candidate volume.
 
 Default output directory:
 - `/Users/derekchen/Desktop/company-yellow-page-output`
