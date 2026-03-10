@@ -1,69 +1,69 @@
 # yellow-page-translator — Skill Brief (Step 1)
 
-## 要解决的问题
-这个技能用于把黄页数据库中的公司简介/描述等文本，从英文批量翻译成中文或其他语言，并经过行业视角审校后输出可回写/可交付的最终文件，替代手工“逐条导出→复制粘贴翻译→人工校对→再拼回文件”的流程。
+## Problem to Solve
+This skill batch-translates company profile text (such as intro/description) from English into Chinese or other target languages, then performs industry-tone review and produces delivery-ready outputs. It replaces the manual flow of export -> copy/paste translation -> manual proofreading -> merge back.
 
-## 目标用户
-- 主要用户：你自己（负责翻译脚本与内容更新的人）
-- 次要用户：团队内运营/内容编辑（需要快速获得可发布的多语言内容）
-- 潜在用户：工程同事（需要标准化产出文件用于回写 DB 或上线）
+## Target Users
+- Primary: the maintainer running translation scripts and content updates
+- Secondary: operations/content editors who need publish-ready multilingual text quickly
+- Potential: engineers who need standardized output files for DB writeback or release
 
-## 触发语句（示例）
-1. “用 .env.prod 把 records 里这些 company keys 的 intro 和 description 从英文翻译成中文，10条一批，翻译+审校后合并输出。”
-2. “只跑翻译阶段：把 batches/batch_0003.jsonl 翻译成 zh-CN，保留公司名、地址、网址不翻。”
-3. “翻译都完成了，帮我跑一遍审校（行业口吻）并生成 final 合并文件。”
-4. “把同一批 keys 额外生成西语（es）版本，并输出 diff 报告标注哪些字段被跳过/保留。”
-5. “从上次中断处继续：跳过 done 的 batch，只处理 pending/error 的 batch。”
+## Trigger Phrases (examples)
+1. "Use .env.prod to translate intro and description for these company keys from English to Chinese, batch size 10, then merge reviewed output."
+2. "Run translate stage only for batches/batch_0003.jsonl to zh-CN, keep company name/address/website unchanged."
+3. "Translation is done; run review (industry tone) and generate final merged output."
+4. "Generate an additional Spanish (es) version for the same keys and output a diff report showing skipped/protected fields."
+5. "Resume from last interruption: skip done batches, process pending/error only."
 
-## 输入
-- 配置来源
-  - env_file: .env 路径（默认 .env）
-  - records_file: key 记录文件路径（jsonl/csv/json）
-- 语言参数
-  - source_lang: 默认 en
-  - target_lang: zh-CN / zh-TW / es / ja 等
-- 字段选择
-  - fields: 要翻译的字段列表（如 intro, description, services）
-- 批处理
-  - batch_size: 默认 10
-  - start_batch / end_batch：只处理某个范围（可选）
-  - resume: 是否断点续跑（默认 true）
-- 专有名词保护
-  - no_translate_fields: 明确永不翻译的字段（如 company_name, address）
-  - glossary_file: 术语表/固定译法（可选）
-- 输出格式
-  - output_format: jsonl / csv / sql（默认 jsonl）
-  - output_dir: 输出目录（默认 ./out）
+## Inputs
+- Config source
+  - env_file: .env path (default .env)
+  - records_file: records path (jsonl/csv/json)
+- Language parameters
+  - source_lang: default en
+  - target_lang: zh-CN / zh-TW / es / ja ...
+- Field selection
+  - fields: list of fields to translate (e.g., intro, description, services)
+- Batch control
+  - batch_size: default 10
+  - start_batch / end_batch: optional range
+  - resume: default true
+- Terminology protection
+  - no_translate_fields: fields never translated (e.g., company_name, address)
+  - glossary_file: optional term glossary
+- Output format
+  - output_format: jsonl / csv / sql (default jsonl)
+  - output_dir: default ./out
 
-## 输出
-- 原始拉取缓存
-  - out/raw/*.json 或 out/raw.jsonl
-- 分批产物
+## Outputs
+- Raw cache
+  - out/raw/*.json or out/raw.jsonl
+- Batch artifacts
   - out/batches/batch_0001.input.jsonl
   - out/batches/batch_0001.translated.jsonl
   - out/batches/batch_0001.reviewed.jsonl
-- Todo / 状态跟踪
-  - out/todo/batch_0001.json（记录状态、错误、完成时间、条目数）
-- 最终合并文件
+- Todo / status tracking
+  - out/todo/batch_0001.json (status, error, completion time, counts)
+- Final merged file
   - out/final/companies_i18n.<target_lang>.<ext>
-- 报告（推荐）
-  - out/report/summary.md（统计、跳过项、失败原因、术语命中）
+- Report (recommended)
+  - out/report/summary.md (counts, skipped items, failures, glossary hits)
 
-## 边界
-- 不直接写回数据库（除非显式授权 + API 文档 + --enable_writeback）
-- 不翻译专有名词/特指信息（公司名、地址、人名、电话、邮箱、网址）
-- 不做夸张营销创作，不虚构资质/荣誉/数据
-- 不做权限绕过，不猜测 API 能力
+## Boundaries
+- Do not write directly to DB unless explicitly authorized and API contract is provided
+- Do not translate protected proper nouns/identifiers (company name, address, personal names, phone, email, website)
+- Do not fabricate qualifications, awards, or business claims
+- Do not bypass access controls or assume unsupported API capabilities
 
-## 验收标准
-- 正确性
-  - 每条 key 在输出中可追踪（result 或 skipped/error）
-  - 专有名词保护生效
-  - 审校结果相对直译有可解释优化
-- 可用性
-  - 支持断点续跑，不重复处理 done batch
-  - 失败可定位，todo 与 summary.md 有明确原因和建议
-- 效率
-  - 按 batch_size=10 产物稳定输出
-- 交付
-  - final 文件格式符合约定（jsonl/csv/sql），字段完整可用于回写/上线
+## Acceptance Criteria
+- Correctness
+  - Every key is traceable in output (result or skipped/error)
+  - Protected-field rules are enforced
+  - Review output improves fluency while preserving meaning
+- Usability
+  - Supports resume without reprocessing done batches
+  - Failures are diagnosable via todo and summary report
+- Efficiency
+  - Stable output under batch_size=10
+- Delivery
+  - Final format meets contract (jsonl/csv/sql) and is ready for writeback/release
