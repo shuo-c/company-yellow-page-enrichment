@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import hashlib
 import json
 import re
@@ -184,27 +185,47 @@ def main() -> int:
     p.add_argument("--candidates", required=True, help="candidate JSONL")
     p.add_argument("--out", required=True, help="raw extracted JSONL")
     p.add_argument("--logos-dir", required=True, help="directory to save downloaded logo files")
+    p.add_argument("--workers", type=int, default=5, help="parallel workers (default: 5)")
+    p.add_argument("--task-timeout", type=int, default=30, help="per-task timeout seconds (default: 30)")
     args = p.parse_args()
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    ok, fail = 0, 0
-    with Path(args.candidates).open("r", encoding="utf-8") as src, out.open("w", encoding="utf-8") as dst:
+    items = []
+    with Path(args.candidates).open("r", encoding="utf-8") as src:
         for line in src:
-            row = json.loads(line)
+            if line.strip():
+                items.append(json.loads(line))
+
+    def job(row: dict) -> dict:
+        url = row.get("url", "")
+        kw = row.get("source_search_keyword", "")
+        return extract_one(url, kw, Path(args.logos_dir))
+
+    ok, fail, timeout = 0, 0, 0
+    with out.open("w", encoding="utf-8") as dst, concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.workers)) as ex:
+        futs = []
+        for row in items:
+            futs.append((row, ex.submit(job, row)))
+
+        for row, fut in futs:
             url = row.get("url", "")
-            kw = row.get("source_search_keyword", "")
             try:
-                rec = extract_one(url, kw, Path(args.logos_dir))
+                rec = fut.result(timeout=max(1, args.task_timeout))
                 dst.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 ok += 1
+            except concurrent.futures.TimeoutError:
+                timeout += 1
+                fut.cancel()
+                dst.write(json.dumps({"official_website": url, "extraction_status": "error", "error": "task_timeout"}) + "\n")
             except Exception as e:
                 fail += 1
                 dst.write(json.dumps({"official_website": url, "extraction_status": "error", "error": str(e)}) + "\n")
 
     print(f"ok: {ok}")
     print(f"fail: {fail}")
+    print(f"timeout: {timeout}")
     print(f"saved: {out}")
     return 0
 

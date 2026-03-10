@@ -108,6 +108,7 @@ Otherwise skip with reason:
 - Continue processing when one site fails; never stop whole batch for single failure.
 - Hard reject rule: if any core judge fails (CompanyJudgeAgent or LogoJudgeAgent or required-field validation), do not keep that company record in final outputs.
 - Keep strict one-to-one mapping between company record and saved logo file: only valid company records may retain logo files. For rejected records, remove orphan logo files and keep only minimal skip reason logs.
+- Default extraction runtime policy: parallel workers = 5, per-task timeout = 30 seconds.
 
 ## Execution Pattern (Subtasks)
 
