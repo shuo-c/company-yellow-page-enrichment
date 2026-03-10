@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -20,7 +21,8 @@ def main() -> int:
     p.add_argument("--seed-topic", required=True)
     p.add_argument("--max-keywords", type=int, default=8)
     p.add_argument("--per-keyword", type=int, default=10)
-    p.add_argument("--out-dir", default="./out")
+    default_out_dir = os.getenv("ENRICHMENT_OUTPUT_DIR", "/Users/derekchen/Desktop/company-yellow-page-output")
+    p.add_argument("--out-dir", default=default_out_dir)
     p.add_argument("--name", default="company_enrichment")
     args = p.parse_args()
 

@@ -135,13 +135,18 @@ python3 scripts/run_pipeline.py \
   --seed-topic IT \
   --max-keywords 8 \
   --per-keyword 10 \
-  --out-dir ./out \
   --name sydney_it_companies
 ```
 
+Default output directory:
+- `/Users/derekchen/Desktop/company-yellow-page-output`
+- Override by CLI: `--out-dir <path>`
+- Override default globally: `ENRICHMENT_OUTPUT_DIR=<path>`
+
 Outputs:
-- `out/<name>.csv`
-- `out/<name>.json`
-- `out/summary.md`
-- `out/work/*.jsonl` (intermediate files)
+- `<out-dir>/<name>.csv`
+- `<out-dir>/<name>.json`
+- `<out-dir>/summary.md`
+- `<out-dir>/logos/*` (downloaded logo files)
+- `<out-dir>/work/*.jsonl` (intermediate files)
 
