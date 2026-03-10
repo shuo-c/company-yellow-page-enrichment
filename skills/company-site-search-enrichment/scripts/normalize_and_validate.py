@@ -52,11 +52,15 @@ def main() -> int:
             logo = clean(r.get("logo_url", ""))
             saved_logo_path = clean(r.get("saved_logo_path", ""))
             desc = clean(r.get("company_description", ""))
+            company_site_passed = bool(r.get("company_site_passed", True))
+            company_site_reason = clean(r.get("company_site_reason", ""))
             domain = site.split("//")[-1].split("/")[0].lower()
 
             reason = ""
             if not site:
                 reason = "unofficial_website"
+            elif not company_site_passed:
+                reason = company_site_reason or "not_company_website_or_directory"
             elif domain in seen_domains:
                 reason = "duplicate_domain"
             elif not logo:

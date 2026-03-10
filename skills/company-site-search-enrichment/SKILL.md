@@ -26,8 +26,9 @@ Extract structured company records from search + official websites for yellow pa
 
 4. **Validate required fields**
    - Mandatory: `logo` and `company_description`.
+   - Website must pass `CompanyJudgeAgent` (reject non-company websites and directory/yellow-page listing sites).
    - Logo must pass `LogoJudgeAgent` quality check (reject mostly-white/low-information/non-meaningful logos).
-   - If either is missing or logo fails quality: skip record and log reason.
+   - If requirement fails: skip record and log reason.
 
 5. **Enrich and normalize**
    - Generate 3–8 business hashtags from actual site content.
@@ -81,6 +82,8 @@ Only save record when all are true:
 - company description extracted
 
 Otherwise skip with reason:
+- `not_company_website_or_directory`
+- `directory_site`
 - `missing_logo`
 - `missing_logo_file`
 - `logo_mostly_white`
