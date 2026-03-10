@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 
@@ -15,7 +17,79 @@ def domain(url: str) -> str:
         return ""
 
 
-def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1200) -> list[dict]:
+def clean_google_href(href: str) -> str:
+    if not href:
+        return ""
+    if href.startswith("/url?"):
+        q = urllib.parse.urlparse(href).query
+        params = urllib.parse.parse_qs(q)
+        return params.get("q", [""])[0]
+    return href
+
+
+def clean_duckduckgo_href(href: str) -> str:
+    if not href:
+        return ""
+    href = href.replace("&amp;", "&")
+    if href.startswith("//"):
+        href = "https:" + href
+    p = urllib.parse.urlparse(href)
+    if "duckduckgo.com" in p.netloc and p.path.startswith("/l/"):
+        params = urllib.parse.parse_qs(p.query)
+        return params.get("uddg", [""])[0]
+    return href
+
+
+def try_accept_consent(page) -> None:
+    candidates = [
+        "I agree",
+        "Accept all",
+        "Accept",
+        "Agree",
+        "接受全部",
+        "同意",
+    ]
+    for label in candidates:
+        try:
+            page.get_by_role("button", name=label).first.click(timeout=1200)
+            page.wait_for_timeout(500)
+            return
+        except Exception:
+            pass
+
+
+def collect_with_duckduckgo(query: str, per_keyword: int) -> list[dict]:
+    url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote_plus(query)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        html = r.read().decode("utf-8", errors="replace")
+
+    links = re.findall(r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, flags=re.I | re.S)
+    rows = []
+    rank = 0
+    seen = set()
+    for href, title_html in links:
+        if rank >= per_keyword:
+            break
+        href = clean_duckduckgo_href(href.strip())
+        d = domain(href)
+        if not href.startswith("http") or not d or d in seen:
+            continue
+        seen.add(d)
+        title = re.sub(r"<[^>]+>", "", title_html).strip()
+        rank += 1
+        rows.append({
+            "rank": rank,
+            "title": title,
+            "url": href,
+            "description": "",
+            "source_search_keyword": query,
+            "domain": d,
+        })
+    return rows
+
+
+def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) -> list[dict]:
     try:
         from playwright.sync_api import sync_playwright
     except Exception as e:
@@ -28,46 +102,92 @@ def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1200) 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        search_url = f"https://www.google.com/search?q={urllib.parse.quote_plus(query)}&num={max(per_keyword, 10)}"
+        search_url = f"https://www.google.com/search?q={urllib.parse.quote_plus(query)}&num={max(per_keyword, 10)}&hl=en"
         page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(delay_ms)
 
-        # Try to accept consent dialog when present.
-        for label in ["I agree", "Accept all", "Accept", "Agree"]:
-            try:
-                page.get_by_role("button", name=label).first.click(timeout=1500)
-                page.wait_for_timeout(500)
-                break
-            except Exception:
-                pass
+        try_accept_consent(page)
 
-        links = page.locator("a:has(h3)")
-        count = links.count()
+        selectors = [
+            "a:has(h3)",
+            "div#search a h3",
+            "div.g a",
+            "a[jsname]",
+        ]
+
+        seen_urls = set()
         rank = 0
-        for i in range(count):
+
+        for sel in selectors:
+            try:
+                if sel == "div#search a h3":
+                    nodes = page.locator(sel)
+                    count = nodes.count()
+                    for i in range(count):
+                        if rank >= per_keyword:
+                            break
+                        h3 = nodes.nth(i)
+                        a = h3.locator("xpath=ancestor::a[1]").first
+                        href = clean_google_href(a.get_attribute("href") or "")
+                        if not href.startswith("http"):
+                            continue
+                        d = domain(href)
+                        if not d or href in seen_urls:
+                            continue
+                        seen_urls.add(href)
+                        rank += 1
+                        rows.append(
+                            {
+                                "rank": rank,
+                                "title": (h3.inner_text(timeout=1200) or "").strip(),
+                                "url": href,
+                                "description": "",
+                                "source_search_keyword": query,
+                                "domain": d,
+                            }
+                        )
+                else:
+                    nodes = page.locator(sel)
+                    count = nodes.count()
+                    for i in range(count):
+                        if rank >= per_keyword:
+                            break
+                        n = nodes.nth(i)
+                        href = ""
+                        title = ""
+                        if sel == "a:has(h3)":
+                            href = clean_google_href(n.get_attribute("href") or "")
+                            h3 = n.locator("h3").first
+                            title = (h3.inner_text(timeout=1200) or "").strip() if h3.count() else ""
+                        elif sel == "div.g a":
+                            href = clean_google_href(n.get_attribute("href") or "")
+                            title = (n.inner_text(timeout=1000) or "").split("\n")[0].strip()
+                        else:
+                            href = clean_google_href(n.get_attribute("href") or "")
+                            title = (n.inner_text(timeout=1000) or "").split("\n")[0].strip()
+
+                        if not href.startswith("http"):
+                            continue
+                        d = domain(href)
+                        if not d or href in seen_urls:
+                            continue
+                        seen_urls.add(href)
+                        rank += 1
+                        rows.append(
+                            {
+                                "rank": rank,
+                                "title": title,
+                                "url": href,
+                                "description": "",
+                                "source_search_keyword": query,
+                                "domain": d,
+                            }
+                        )
+            except Exception:
+                continue
+
             if rank >= per_keyword:
                 break
-            a = links.nth(i)
-            href = a.get_attribute("href") or ""
-            title = a.locator("h3").first.inner_text(timeout=2000) if a.locator("h3").count() else ""
-
-            if not href.startswith("http"):
-                continue
-            d = domain(href)
-            if not d:
-                continue
-
-            rank += 1
-            rows.append(
-                {
-                    "rank": rank,
-                    "title": title.strip(),
-                    "url": href,
-                    "description": "",
-                    "source_search_keyword": query,
-                    "domain": d,
-                }
-            )
 
         browser.close()
 
@@ -79,7 +199,8 @@ def main() -> int:
     p.add_argument("--keywords", required=True, help="keywords JSON from query_builder")
     p.add_argument("--out", required=True, help="output JSONL")
     p.add_argument("--per-keyword", type=int, default=10)
-    p.add_argument("--delay-ms", type=int, default=1200)
+    p.add_argument("--delay-ms", type=int, default=1500)
+    p.add_argument("--retries", type=int, default=2)
     args = p.parse_args()
 
     kws = json.loads(Path(args.keywords).read_text(encoding="utf-8")).get("keywords", [])
@@ -87,7 +208,16 @@ def main() -> int:
     rows = []
 
     for kw in kws:
-        one = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
+        one: list[dict] = []
+        for attempt in range(args.retries + 1):
+            one = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
+            if one:
+                break
+            time.sleep(1.0 + attempt)
+
+        if not one:
+            one = collect_with_duckduckgo(kw, args.per_keyword)
+
         for r in one:
             d = r.get("domain", "")
             if not d or d in seen:
