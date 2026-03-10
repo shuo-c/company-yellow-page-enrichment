@@ -114,3 +114,32 @@ Always report:
 - skipped by reason
 - duplicates removed
 - final rows written
+
+## Script Entrypoints (v0.1)
+
+- `scripts/query_builder.py`
+- `scripts/search_collector.py` (requires `BRAVE_API_KEY`)
+- `scripts/site_extractor.py`
+- `scripts/normalize_and_validate.py`
+- `scripts/export_records.py`
+- `scripts/run_pipeline.py` (end-to-end runner)
+
+Run example:
+
+```bash
+export BRAVE_API_KEY=...
+python3 scripts/run_pipeline.py \
+  --location Sydney \
+  --seed-topic IT \
+  --max-keywords 8 \
+  --per-keyword 10 \
+  --out-dir ./out \
+  --name sydney_it_companies
+```
+
+Outputs:
+- `out/<name>.csv`
+- `out/<name>.json`
+- `out/summary.md`
+- `out/work/*.jsonl` (intermediate files)
+
