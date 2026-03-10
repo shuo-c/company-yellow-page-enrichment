@@ -60,7 +60,8 @@ Extract structured company records from search + official websites for yellow pa
 
 - `company_name`
 - `official_website`
-- `logo_url` (or local saved path)
+- `logo_url`
+- `saved_logo_path` (mandatory local file path)
 - `company_description`
 - `business_scope_summary`
 - `hashtags`
@@ -75,11 +76,12 @@ Extract structured company records from search + official websites for yellow pa
 
 Only save record when all are true:
 - official website found
-- logo extracted
+- logo file downloaded and saved locally (`saved_logo_path` exists)
 - company description extracted
 
 Otherwise skip with reason:
 - `missing_logo`
+- `missing_logo_file`
 - `missing_description`
 - `unofficial_website`
 - `duplicate_domain`

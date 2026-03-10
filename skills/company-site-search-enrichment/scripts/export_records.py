@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 FIELDS = [
-    "company_name", "official_website", "logo_url", "company_description", "business_scope_summary", "hashtags",
+    "company_name", "official_website", "logo_url", "saved_logo_path", "company_description", "business_scope_summary", "hashtags",
     "phone", "email", "address", "office_location", "contact_page", "about_page", "services_page",
     "source_search_keyword", "extraction_confidence", "extraction_status", "extraction_timestamp"
 ]

@@ -47,6 +47,7 @@ def main() -> int:
             r = json.loads(line)
             site = clean(r.get("official_website", ""))
             logo = clean(r.get("logo_url", ""))
+            saved_logo_path = clean(r.get("saved_logo_path", ""))
             desc = clean(r.get("company_description", ""))
             domain = site.split("//")[-1].split("/")[0].lower()
 
@@ -57,6 +58,10 @@ def main() -> int:
                 reason = "duplicate_domain"
             elif not logo:
                 reason = "missing_logo"
+            elif not saved_logo_path:
+                reason = "missing_logo_file"
+            elif not Path(saved_logo_path).exists():
+                reason = "missing_logo_file"
             elif not desc:
                 reason = "missing_description"
 

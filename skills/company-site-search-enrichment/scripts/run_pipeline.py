@@ -34,11 +34,12 @@ def main() -> int:
     raw = work / "raw_extracted.jsonl"
     valid = work / "valid.jsonl"
     skipped = work / "skipped.jsonl"
+    logos_dir = out / "logos"
 
     py = sys.executable
     run([py, str(root / "query_builder.py"), "--location", args.location, "--seed-topic", args.seed_topic, "--max-keywords", str(args.max_keywords), "--out", str(keywords)])
     run([py, str(root / "search_collector.py"), "--keywords", str(keywords), "--out", str(cands), "--per-keyword", str(args.per_keyword)])
-    run([py, str(root / "site_extractor.py"), "--candidates", str(cands), "--out", str(raw)])
+    run([py, str(root / "site_extractor.py"), "--candidates", str(cands), "--out", str(raw), "--logos-dir", str(logos_dir)])
     run([py, str(root / "normalize_and_validate.py"), "--infile", str(raw), "--out-valid", str(valid), "--out-skipped", str(skipped)])
     run([py, str(root / "export_records.py"), "--valid-jsonl", str(valid), "--skipped-jsonl", str(skipped), "--out-dir", str(out), "--name", args.name])
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import urllib.parse
@@ -60,7 +61,27 @@ def abs_url(base: str, maybe: str) -> str:
     return urllib.parse.urljoin(base, maybe)
 
 
-def extract_one(url: str, keyword: str) -> dict:
+def download_logo(logo_url: str, logos_dir: Path, website_url: str) -> str:
+    if not logo_url:
+        return ""
+    logos_dir.mkdir(parents=True, exist_ok=True)
+    parsed = urllib.parse.urlparse(logo_url)
+    ext = Path(parsed.path).suffix.lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico"}:
+        ext = ".png"
+    digest = hashlib.sha1((website_url + "|" + logo_url).encode("utf-8")).hexdigest()[:16]
+    target = logos_dir / f"logo_{digest}{ext}"
+
+    req = urllib.request.Request(logo_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        data = r.read()
+    if not data:
+        return ""
+    target.write_bytes(data)
+    return str(target)
+
+
+def extract_one(url: str, keyword: str, logos_dir: Path) -> dict:
     html = fetch(url)
     p = MetaParser()
     p.feed(html)
@@ -68,6 +89,11 @@ def extract_one(url: str, keyword: str) -> dict:
     desc = p.meta.get("description") or p.meta.get("og:description") or ""
     company = p.meta.get("og:site_name") or p.title.strip()
     logo = abs_url(url, p.logo)
+    saved_logo_path = ""
+    try:
+        saved_logo_path = download_logo(logo, logos_dir, url)
+    except Exception:
+        saved_logo_path = ""
 
     emails = sorted(set(EMAIL_RE.findall(html)))
     phones = sorted(set(PHONE_RE.findall(html)))
@@ -82,6 +108,7 @@ def extract_one(url: str, keyword: str) -> dict:
         "company_name": company,
         "official_website": url,
         "logo_url": logo,
+        "saved_logo_path": saved_logo_path,
         "company_description": text_desc,
         "business_scope_summary": ", ".join(sorted(set(services)))[:500],
         "hashtags": [],
@@ -102,6 +129,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Extract company fields from candidate websites")
     p.add_argument("--candidates", required=True, help="candidate JSONL")
     p.add_argument("--out", required=True, help="raw extracted JSONL")
+    p.add_argument("--logos-dir", required=True, help="directory to save downloaded logo files")
     args = p.parse_args()
 
     out = Path(args.out)
@@ -114,7 +142,7 @@ def main() -> int:
             url = row.get("url", "")
             kw = row.get("source_search_keyword", "")
             try:
-                rec = extract_one(url, kw)
+                rec = extract_one(url, kw, Path(args.logos_dir))
                 dst.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 ok += 1
             except Exception as e:
