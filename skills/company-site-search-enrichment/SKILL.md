@@ -152,6 +152,9 @@ Otherwise skip with reason:
 - Keep strict one-to-one mapping between company record and saved logo file: only valid company records may retain logo files. For rejected records, remove orphan logo files and keep only minimal skip reason logs.
 - Saved logo filenames must be company-name aligned (sanitized company slug + unique suffix) for traceability.
 - Default extraction runtime policy: parallel workers = 5, per-task timeout = 30 seconds.
+- When requested target count is **>= 20**, switch to **parallel distributed processing** (batched keyword/candidate collection and parallel extraction workers).
+- In parallel mode, any single task exceeding **30s** must be skipped and marked timeout, without blocking the full run.
+- If timeouts occur continuously (consecutive timeout failures), pause the pipeline for **10 minutes** and then resume from remaining batches.
 
 ## Execution Pattern (Subtasks)
 
