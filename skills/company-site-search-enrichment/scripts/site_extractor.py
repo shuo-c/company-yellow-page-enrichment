@@ -14,6 +14,7 @@ from company_judge_agent import CompanyJudgeAgent
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
+ADDRESS_RE = re.compile(r"\b\d{1,5}\s+[A-Za-z0-9\s.,'-]{8,}(?:WA|NSW|VIC|QLD|SA|TAS|ACT|NT)\s*\d{3,4}\b", re.I)
 
 
 class MetaParser(HTMLParser):
@@ -63,6 +64,34 @@ def abs_url(base: str, maybe: str) -> str:
     return urllib.parse.urljoin(base, maybe)
 
 
+def clean_text_from_html(html: str) -> str:
+    text = re.sub(r"<script[\s\S]*?</script>", " ", html, flags=re.I)
+    text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def first_nonempty(*vals: str) -> str:
+    for v in vals:
+        if v and v.strip():
+            return v.strip()
+    return ""
+
+
+def summarize_scope(text: str) -> str:
+    candidates = []
+    for sent in re.split(r"(?<=[.!?])\s+", text):
+        s = sent.strip()
+        if not s:
+            continue
+        low = s.lower()
+        if any(k in low for k in ["service", "solution", "build", "construction", "renovation", "project", "commercial", "residential"]):
+            candidates.append(s)
+        if len(candidates) >= 3:
+            break
+    return " ".join(candidates)[:700]
+
+
 def download_logo(logo_url: str, logos_dir: Path, website_url: str) -> str:
     if not logo_url:
         return ""
@@ -83,6 +112,14 @@ def download_logo(logo_url: str, logos_dir: Path, website_url: str) -> str:
     return str(target)
 
 
+def fetch_optional_page(base_url: str, path: str) -> tuple[str, str]:
+    url = abs_url(base_url, path)
+    try:
+        return url, fetch(url)
+    except Exception:
+        return url, ""
+
+
 def extract_one(url: str, keyword: str, logos_dir: Path) -> dict:
     html = fetch(url)
     p = MetaParser()
@@ -91,8 +128,21 @@ def extract_one(url: str, keyword: str, logos_dir: Path) -> dict:
     judge = CompanyJudgeAgent()
     cj = judge.judge(url, p.title.strip(), html)
 
-    desc = p.meta.get("description") or p.meta.get("og:description") or ""
-    company = p.meta.get("og:site_name") or p.title.strip()
+    homepage_text = clean_text_from_html(html)
+
+    contact_page, contact_html = fetch_optional_page(url, "/contact")
+    about_page, about_html = fetch_optional_page(url, "/about")
+    services_page, services_html = fetch_optional_page(url, "/services")
+
+    contact_text = clean_text_from_html(contact_html)
+    about_text = clean_text_from_html(about_html)
+    services_text = clean_text_from_html(services_html)
+
+    desc_meta = first_nonempty(p.meta.get("description", ""), p.meta.get("og:description", ""))
+    desc_fallback = first_nonempty(about_text[:500], homepage_text[:500])
+    company_description = first_nonempty(desc_meta, desc_fallback)
+
+    company = first_nonempty(p.meta.get("og:site_name", ""), p.title.strip())
     logo = abs_url(url, p.logo)
     saved_logo_path = ""
     try:
@@ -100,30 +150,26 @@ def extract_one(url: str, keyword: str, logos_dir: Path) -> dict:
     except Exception:
         saved_logo_path = ""
 
-    emails = sorted(set(EMAIL_RE.findall(html)))
-    phones = sorted(set(PHONE_RE.findall(html)))
-
-    text_desc = re.sub(r"\s+", " ", desc).strip()
-    services = []
-    for token in ["service", "solution", "consulting", "support", "development", "construction", "accounting", "marketing"]:
-        if token in html.lower():
-            services.append(token)
+    joined_text = "\n".join([homepage_text, about_text, services_text, contact_text])
+    emails = sorted(set(EMAIL_RE.findall(joined_text)))
+    phones = sorted(set(PHONE_RE.findall(joined_text)))
+    addresses = sorted(set(ADDRESS_RE.findall(joined_text)))
 
     return {
         "company_name": company,
         "official_website": url,
         "logo_url": logo,
         "saved_logo_path": saved_logo_path,
-        "company_description": text_desc,
-        "business_scope_summary": ", ".join(sorted(set(services)))[:500],
+        "company_description": re.sub(r"\s+", " ", company_description).strip()[:1200],
+        "business_scope_summary": summarize_scope(first_nonempty(services_text, homepage_text, about_text)),
         "hashtags": [],
         "phone": phones[0] if phones else "",
         "email": emails[0] if emails else "",
-        "address": "",
-        "office_location": "",
-        "contact_page": abs_url(url, "/contact"),
-        "about_page": abs_url(url, "/about"),
-        "services_page": abs_url(url, "/services"),
+        "address": addresses[0] if addresses else "",
+        "office_location": keyword.split()[0] if keyword else "",
+        "contact_page": contact_page,
+        "about_page": about_page,
+        "services_page": services_page,
         "source_search_keyword": keyword,
         "company_site_passed": cj.passed,
         "company_site_reason": cj.reason,

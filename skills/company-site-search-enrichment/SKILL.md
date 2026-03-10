@@ -22,7 +22,8 @@ Extract structured company records from search + official websites for yellow pa
 
 3. **Visit official websites and extract raw data**
    - Target pages: homepage, about, services, contact.
-   - Extract: company name, logo, company description, services/business scope, contact details, address.
+   - Extract: company name, logo file, rich company description (meta + page text fallback), business scope summary, contact details, and address.
+   - Merge signals across pages to improve completeness.
 
 4. **Validate required fields**
    - Mandatory: `logo` and `company_description`.
