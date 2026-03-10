@@ -98,6 +98,8 @@ Common optional keys:
   - `pending` | `translated` | `done` | `error`
 - Record error message and timestamp for failed batches.
 - Resume should skip `done` by default and continue `pending/error`.
+- When expected search results are not satisfied, automatically expand search scope using semantically similar terms and close synonyms before concluding no match.
+- When execution stops because of `agents.defaults.timeoutSeconds`, return a partial-progress summary immediately (completed stages, completed batch ids/counts, current stage, and remaining pending/error batches).
 
 ## Reference Files
 
