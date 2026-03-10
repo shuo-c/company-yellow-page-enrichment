@@ -93,7 +93,12 @@ def summarize_scope(text: str) -> str:
     return " ".join(candidates)[:700]
 
 
-def download_logo(logo_url: str, logos_dir: Path, website_url: str) -> str:
+def safe_slug(name: str) -> str:
+    s = re.sub(r"[^A-Za-z0-9]+", "_", (name or "").strip()).strip("_")
+    return s[:80] or "unknown_company"
+
+
+def download_logo(logo_url: str, logos_dir: Path, website_url: str, company_name: str) -> str:
     if not logo_url:
         return ""
     logos_dir.mkdir(parents=True, exist_ok=True)
@@ -101,8 +106,9 @@ def download_logo(logo_url: str, logos_dir: Path, website_url: str) -> str:
     ext = Path(parsed.path).suffix.lower()
     if ext not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico"}:
         ext = ".png"
-    digest = hashlib.sha1((website_url + "|" + logo_url).encode("utf-8")).hexdigest()[:16]
-    target = logos_dir / f"logo_{digest}{ext}"
+    digest = hashlib.sha1((website_url + "|" + logo_url).encode("utf-8")).hexdigest()[:10]
+    slug = safe_slug(company_name)
+    target = logos_dir / f"{slug}_{digest}{ext}"
 
     req = urllib.request.Request(logo_url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -147,7 +153,7 @@ def extract_one(url: str, keyword: str, logos_dir: Path) -> dict:
     logo = abs_url(url, p.logo)
     saved_logo_path = ""
     try:
-        saved_logo_path = download_logo(logo, logos_dir, url)
+        saved_logo_path = download_logo(logo, logos_dir, url, company)
     except Exception:
         saved_logo_path = ""
 
