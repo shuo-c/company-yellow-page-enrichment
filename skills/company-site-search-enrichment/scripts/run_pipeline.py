@@ -19,7 +19,8 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Run end-to-end company site enrichment pipeline")
     p.add_argument("--location", required=True)
     p.add_argument("--seed-topic", required=True)
-    p.add_argument("--max-keywords", type=int, default=8)
+    p.add_argument("--expansion-count", type=int, default=10, help="keyword expansion count passed to query_builder")
+    p.add_argument("--max-keywords", type=int, default=None, help="deprecated alias of --expansion-count")
     p.add_argument("--batch-size", type=int, default=10, help="candidate rows per keyword batch")
     p.add_argument("--target-candidates", type=int, default=50, help="target candidate domains before extraction")
     p.add_argument("--workers", type=int, default=5, help="parallel extractor workers")
@@ -44,7 +45,8 @@ def main() -> int:
     py = sys.executable
     per_keyword = args.per_keyword if args.per_keyword is not None else args.batch_size
 
-    run([py, str(root / "query_builder.py"), "--location", args.location, "--seed-topic", args.seed_topic, "--max-keywords", str(args.max_keywords), "--out", str(keywords)])
+    kw_count = args.max_keywords if args.max_keywords is not None else args.expansion_count
+    run([py, str(root / "query_builder.py"), "--location", args.location, "--seed-topic", args.seed_topic, "--expansion-count", str(kw_count), "--location-mode", "mixed", "--mixed-city-ratio", "0.7", "--out", str(keywords)])
     run([
         py,
         str(root / "search_collector.py"),

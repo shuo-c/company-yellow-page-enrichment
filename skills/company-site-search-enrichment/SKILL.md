@@ -10,8 +10,10 @@ Extract structured company records from search + official websites for yellow pa
 ## Workflow
 
 1. **Build search keywords**
-   - Always include: `location + industry + company`.
-   - Valid examples: `Sydney IT company`, `Melbourne accounting company`.
+   - Always include: `location + industry/service + company`.
+   - Valid examples: `Sydney IT company`, `Melbourne accounting company`, `NSW Home Builder company`.
+   - Keyword builder uses associative expansion (agent-like term association) and expands one seed to about 10 queries by default.
+   - Formal parameter: `--expansion-count` (default 10; deprecated alias `--max-keywords`).
    - Reject keywords without `company`.
 
 2. **Collect candidate websites (Playwright + Google)**
@@ -84,6 +86,9 @@ Accepts combined forms like `Sydney NSW` or `Sydney, NSW`.
 - `language`
 - `country`
 - `search_depth`
+- `expansion_count` (default 10)
+- `location_mode` (`fixed|city|state|mixed`, default `mixed`)
+- `mixed_city_ratio` (default `0.7`)
 - `official_site_only`
 - `require_logo` (default true)
 - `require_intro` (default true)
@@ -223,7 +228,7 @@ bash scripts/setup_playwright.sh
 python3 scripts/run_pipeline.py \
   --location Sydney \
   --seed-topic IT \
-  --max-keywords 8 \
+  --expansion-count 10 \
   --batch-size 10 \
   --target-candidates 50 \
   --workers 5 \
