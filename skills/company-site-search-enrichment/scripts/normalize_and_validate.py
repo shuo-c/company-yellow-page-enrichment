@@ -6,7 +6,6 @@ import json
 import re
 from pathlib import Path
 
-from logo_judge_agent import LogoJudgeAgent
 
 
 def hashtags_from_text(text: str, scope: str) -> list[str]:
@@ -43,7 +42,6 @@ def main() -> int:
     valid.parent.mkdir(parents=True, exist_ok=True)
 
     seen_domains = set()
-    judge = LogoJudgeAgent()
     ok = sk = 0
     with Path(args.infile).open("r", encoding="utf-8") as src, valid.open("w", encoding="utf-8") as v, skipped.open("w", encoding="utf-8") as s:
         for line in src:
@@ -52,15 +50,11 @@ def main() -> int:
             logo = clean(r.get("logo_url", ""))
             saved_logo_path = clean(r.get("saved_logo_path", ""))
             desc = clean(r.get("company_description", ""))
-            company_site_passed = bool(r.get("company_site_passed", True))
-            company_site_reason = clean(r.get("company_site_reason", ""))
             domain = site.split("//")[-1].split("/")[0].lower()
 
             reason = ""
             if not site:
                 reason = "unofficial_website"
-            elif not company_site_passed:
-                reason = company_site_reason or "not_company_website_or_directory"
             elif domain in seen_domains:
                 reason = "duplicate_domain"
             elif not logo:
@@ -69,11 +63,6 @@ def main() -> int:
                 reason = "missing_logo_file"
             elif not Path(saved_logo_path).exists():
                 reason = "missing_logo_file"
-            else:
-                jr = judge.judge(saved_logo_path)
-                if not jr.passed:
-                    reason = jr.reason
-                    r["logo_quality_score"] = jr.score
 
             if not reason and not desc:
                 reason = "missing_description"

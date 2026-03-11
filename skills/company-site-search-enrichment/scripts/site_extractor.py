@@ -11,7 +11,6 @@ import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
 
-from company_judge_agent import CompanyJudgeAgent
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
@@ -132,9 +131,6 @@ def extract_one(url: str, keyword: str, logos_dir: Path) -> dict:
     p = MetaParser()
     p.feed(html)
 
-    judge = CompanyJudgeAgent()
-    cj = judge.judge(url, p.title.strip(), html)
-
     homepage_text = clean_text_from_html(html)
 
     contact_page, contact_html = fetch_optional_page(url, "/contact")
@@ -178,9 +174,9 @@ def extract_one(url: str, keyword: str, logos_dir: Path) -> dict:
         "about_page": about_page,
         "services_page": services_page,
         "source_search_keyword": keyword,
-        "company_site_passed": cj.passed,
-        "company_site_reason": cj.reason,
-        "company_site_score": cj.score,
+        "company_site_passed": True,
+        "company_site_reason": "not_checked",
+        "company_site_score": 0.0,
         "extraction_confidence": 0.6,
         "extraction_status": "raw",
     }

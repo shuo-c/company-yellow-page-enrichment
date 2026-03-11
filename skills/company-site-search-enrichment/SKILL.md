@@ -27,8 +27,7 @@ Extract structured company records from search + official websites for yellow pa
 
 4. **Validate required fields**
    - Mandatory: `logo` and `company_description`.
-   - Website must pass `CompanyJudgeAgent` (reject non-company websites and directory/yellow-page listing sites).
-   - Logo must pass `LogoJudgeAgent` quality check (reject mostly-white/low-information/non-meaningful logos).
+   - Check only structural completeness in enrichment stage (do not run company/logo reasonability judges here).
    - If requirement fails: skip record and log reason.
 
 5. **Enrich and normalize**
@@ -125,21 +124,15 @@ Only save record when all are true:
 - company description extracted
 
 Otherwise skip with reason:
-- `not_company_website_or_directory`
-- `directory_site`
 - `missing_logo`
 - `missing_logo_file`
-- `logo_mostly_white`
-- `logo_low_variance`
-- `logo_low_edge_density`
-- `logo_not_meaningful`
-- `logo_too_small`
-- `logo_too_transparent_or_empty`
 - `missing_description`
 - `unofficial_website`
 - `duplicate_domain`
 - `inaccessible_site`
 - `insufficient_content`
+
+Company/logo reasonability checks are now an independent post-task via `scripts/company_logo_quality_check.py`.
 
 ## Guardrails
 
@@ -148,7 +141,8 @@ Otherwise skip with reason:
 - Do not bypass paywalls/protected systems.
 - Do not treat third-party directory data as primary truth unless explicit fallback is enabled.
 - Continue processing when one site fails; never stop whole batch for single failure.
-- Hard reject rule: if any core judge fails (CompanyJudgeAgent or LogoJudgeAgent or required-field validation), do not keep that company record in final outputs.
+- Hard reject rule in enrichment stage: only required-field validation failures are rejected.
+- CompanyJudgeAgent/LogoJudgeAgent checks run in the independent quality-check task.
 - Keep strict one-to-one mapping between company record and saved logo file: only valid company records may retain logo files. For rejected records, remove orphan logo files and keep only minimal skip reason logs.
 - Saved logo filenames must be company-name aligned (sanitized company slug + unique suffix) for traceability.
 - Default extraction runtime policy: parallel workers = 5, per-task timeout = 30 seconds.
@@ -183,6 +177,7 @@ Always report:
 - `scripts/search_collector.py` (Playwright + Google search; no API key required)
 - `scripts/site_extractor.py`
 - `scripts/normalize_and_validate.py`
+- `scripts/company_logo_quality_check.py` (independent post-task)
 - `scripts/export_records.py`
 - `scripts/run_pipeline.py` (end-to-end runner)
 
