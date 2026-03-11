@@ -40,6 +40,38 @@ Extract structured company records from search + official websites for yellow pa
    - Output CSV/JSON/database-ready rows.
    - Include run summary metrics and skip reasons.
 
+## Industry/Service Taxonomy Filters (New)
+
+Use the following reference files as the authoritative filter lists:
+
+- `references/industries.csv` (industry taxonomy; columns: `industry_id`, `name`)
+- `references/services.csv` (service/sub-industry taxonomy; columns: `service_id`, `name`)
+
+Rules:
+- `seed_topic` must map to an English `name` from either taxonomy file.
+- Industry and sub-industry filters are applied at keyword build stage.
+- If `seed_topic` is not in taxonomy, fail fast with validation error.
+
+## Australia Location Constraints (New)
+
+`location` must be Australia major states/cities.
+
+Allowed states/territories:
+- NSW / New South Wales
+- VIC / Victoria
+- QLD / Queensland
+- WA / Western Australia
+- SA / South Australia
+- TAS / Tasmania
+- ACT / Australian Capital Territory
+- NT / Northern Territory
+
+Allowed major cities:
+- Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra, Hobart, Darwin
+- Gold Coast, Newcastle, Wollongong, Geelong, Sunshine Coast, Townsville, Cairns
+
+Accepts combined forms like `Sydney NSW` or `Sydney, NSW`.
+
 ## Required Inputs
 
 - `seed_topic` (industry keyword, e.g. IT/accounting)
@@ -174,9 +206,9 @@ Always report:
 - duplicates removed
 - final rows written
 
-## Script Entrypoints (v0.1)
+## Script Entrypoints (v0.2)
 
-- `scripts/query_builder.py`
+- `scripts/query_builder.py` (now validates taxonomy + AU location constraints)
 - `scripts/search_collector.py` (Playwright + Google search; no API key required)
 - `scripts/site_extractor.py`
 - `scripts/normalize_and_validate.py`
