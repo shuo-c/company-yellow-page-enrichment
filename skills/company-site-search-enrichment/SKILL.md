@@ -60,32 +60,37 @@ Extract structured company records from search + official websites for yellow pa
 
 ## Strict Output Contract (Must Follow Exactly)
 
-Output each company record as a single JSON object with the exact field names below.
+Output records must match the CSV header from:
+`company-yellow-page-output/sydney_builder_valid_top20.csv`
 
-### Required fields (all required in final record)
+Field names and order must be exactly:
 
-- `company_name` (string)
-- `official_website` (string, absolute URL)
-- `logo_url` (string, absolute URL)
-- `saved_logo_path` (string, absolute local file path; file must exist)
-- `company_description` (string)
-- `business_scope_summary` (string)
-- `hashtags` (string, comma-separated hashtags like `#TagA,#TagB`)
-- `phone` (string; empty string allowed if not found)
-- `email` (string; empty string allowed if not found)
-- `address` (string; empty string allowed if not found)
-- `office_location` (string)
-- `contact_page` (string, absolute URL or empty string)
-- `about_page` (string, absolute URL or empty string)
-- `services_page` (string, absolute URL or empty string)
-- `source_search_keyword` (string)
-- `company_site_passed` (boolean)
-- `company_site_reason` (string)
-- `company_site_score` (number)
-- `extraction_confidence` (number)
-- `extraction_status` (string: `valid` | `skipped` | `error`)
-- `logo_quality_score` (number)
-- `extraction_timestamp` (string, ISO-8601)
+1. `company_name`
+2. `official_website`
+3. `logo_url`
+4. `saved_logo_path`
+5. `company_description`
+6. `business_scope_summary`
+7. `hashtags`
+8. `phone`
+9. `email`
+10. `address`
+11. `office_location`
+12. `contact_page`
+13. `about_page`
+14. `services_page`
+15. `source_search_keyword`
+16. `company_site_score`
+17. `logo_quality_score`
+18. `extraction_confidence`
+19. `extraction_status`
+20. `extraction_timestamp`
+
+Notes:
+- Do not add/remove/reorder columns in final CSV export.
+- `hashtags` must be comma-separated in CSV (e.g. `#TagA,#TagB`).
+- `extraction_timestamp` must be ISO-8601.
+- `company_site_score` and `logo_quality_score` are reserved quality fields; enrichment stage may default them and independent quality-check task may overwrite them.
 
 ### Canonical example (strict shape)
 
@@ -95,23 +100,21 @@ Output each company record as a single JSON object with the exact field names be
   "official_website": "https://sydneycommercialbuilders.com.au/",
   "logo_url": "https://sydneycommercialbuilders.com.au/wp-content/uploads/2019/12/logo-5.png",
   "saved_logo_path": "/Users/derekchen/Desktop/company-yellow-page-output/logos/Sydney_Commercial_Builders_6278e365aa.png",
-  "company_description": "--> --> --> --> --> --> --> About Us &#8211; Sydney Commercial Builders --> --> --> --> --> --> --> admin@pacificbuildingservices.com.au 0417 417 400 Home Profile Services Building works Civil works Excavation and Demolition Asbestos Removal Hoardings Heritage Works Mezzanine floors Design Concepts Office Fit outs Medical centres Retails Hospitality Fire protection Facade Refurbishment Lift installation works Ancillary Services Fire Door Sydney Interior Refurbishment Government FAQ Contact Us Ge",
-  "business_scope_summary": "--> --> --> --> --> --> --> Services &#8211; Sydney Commercial Builders --> --> --> --> --> --> --> admin@pacificbuildingservices.com.au 0417 417 400 Home Profile Services Building works Civil works Excavation and Demolition Asbestos Removal Hoardings Heritage Works Mezzanine floors Design Concepts Office Fit outs Medical centres Retails Hospitality Fire protection Facade Refurbishment Lift installation works Ancillary Services Fire Door Sydney Interior Refurbishment Government FAQ Contact Us Get a Free Quote Our Services Our Services The Sydney Commercial Builders are one of the most known builders and Construction Company which provides the different types of buildings to their customers.",
-  "hashtags": "#ITServices,#Construction",
+  "company_description": "Commercial builder in Sydney delivering fit-outs, refurbishment and construction services.",
+  "business_scope_summary": "Office fit-outs, facade refurbishment, fire protection and related building works.",
+  "hashtags": "#Construction,#CommercialFitout",
   "phone": "0417 417 400",
-  "email": "admin@pacificbuildingservices.com.au",
+  "email": "admin@example.com",
   "address": "1 Bligh Street, Sydney, NSW 2000",
   "office_location": "Sydney",
   "contact_page": "https://sydneycommercialbuilders.com.au/contact",
   "about_page": "https://sydneycommercialbuilders.com.au/about",
   "services_page": "https://sydneycommercialbuilders.com.au/services",
   "source_search_keyword": "Sydney commercial builder company",
-  "company_site_passed": true,
-  "company_site_reason": "ok",
-  "company_site_score": 0.5,
+  "company_site_score": 0.0,
+  "logo_quality_score": 0.8,
   "extraction_confidence": 0.85,
   "extraction_status": "valid",
-  "logo_quality_score": 0.8,
   "extraction_timestamp": "2026-03-10T05:54:15.312657+00:00"
 }
 ```
