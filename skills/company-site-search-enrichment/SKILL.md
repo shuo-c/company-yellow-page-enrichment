@@ -218,7 +218,7 @@ Always report:
 ## Script Entrypoints (v0.2)
 
 - `scripts/query_builder.py` (now validates taxonomy + AU location constraints)
-- `scripts/search_collector.py` (Playwright + Google search; no API key required)
+- `scripts/search_collector.py` (Playwright search; default engines `google,bing`, optional fallback `duckduckgo`)
 - `scripts/site_extractor.py`
 - `scripts/normalize_and_validate.py`
 - `scripts/company_logo_quality_check.py` (independent post-task)
@@ -236,7 +236,8 @@ python3 scripts/run_pipeline.py \
   --batch-size 10 \
   --target-candidates 50 \
   --workers 5 \
-  --name sydney_it_companies
+  --name sydney_it_companies \
+  # optional: --engines google,bing,duckduckgo
 ```
 
 Notes:

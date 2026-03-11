@@ -28,6 +28,16 @@ def clean_google_href(href: str) -> str:
     return href
 
 
+
+
+def clean_bing_href(href: str) -> str:
+    if not href:
+        return ""
+    href = href.strip()
+    if href.startswith("/"):
+        return ""
+    return href
+
 def clean_duckduckgo_href(href: str) -> str:
     if not href:
         return ""
@@ -86,9 +96,62 @@ def collect_with_duckduckgo(query: str, per_keyword: int) -> list[dict]:
             "description": "",
             "source_search_keyword": query,
             "domain": d,
+            "search_engine": "duckduckgo",
         })
     return rows
 
+
+
+
+def collect_with_bing_playwright(query: str, per_keyword: int, delay_ms: int = 1500) -> list[dict]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        raise SystemExit(
+            "Playwright is required. Run scripts/setup_playwright.sh first. "
+            f"Import error: {e}"
+        )
+
+    rows: list[dict] = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        search_url = f"https://www.bing.com/search?q={urllib.parse.quote_plus(query)}&count={max(per_keyword, 10)}&setlang=en"
+        page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(delay_ms)
+
+        nodes = page.locator("li.b_algo h2 a")
+        count = nodes.count()
+        rank = 0
+        seen_urls = set()
+
+        for i in range(count):
+            if rank >= per_keyword:
+                break
+            a = nodes.nth(i)
+            href = clean_bing_href(a.get_attribute("href") or "")
+            if not href.startswith("http"):
+                continue
+            d = domain(href)
+            if not d or href in seen_urls:
+                continue
+            seen_urls.add(href)
+            rank += 1
+            rows.append(
+                {
+                    "rank": rank,
+                    "title": (a.inner_text(timeout=1200) or "").strip(),
+                    "url": href,
+                    "description": "",
+                    "source_search_keyword": query,
+                    "domain": d,
+                    "search_engine": "bing",
+                }
+            )
+
+        browser.close()
+
+    return rows
 
 def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) -> list[dict]:
     try:
@@ -145,6 +208,7 @@ def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) 
                                 "description": "",
                                 "source_search_keyword": query,
                                 "domain": d,
+                                "search_engine": "google",
                             }
                         )
                 else:
@@ -182,6 +246,7 @@ def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) 
                                 "description": "",
                                 "source_search_keyword": query,
                                 "domain": d,
+                                "search_engine": "google",
                             }
                         )
             except Exception:
@@ -204,21 +269,38 @@ def main() -> int:
     p.add_argument("--retries", type=int, default=2)
     p.add_argument("--keyword-workers", type=int, default=5, help="parallel keyword workers")
     p.add_argument("--target-candidates", type=int, default=0, help="stop once this many unique domains are collected (0 = no limit)")
+    p.add_argument("--engines", default="google,bing", help="comma-separated search engines in priority order: google,bing,duckduckgo")
     args = p.parse_args()
 
     kws = json.loads(Path(args.keywords).read_text(encoding="utf-8")).get("keywords", [])
     seen = set()
     rows = []
 
+    engine_order = [e.strip().lower() for e in args.engines.split(",") if e.strip()]
+
     def collect_one_keyword(kw: str) -> list[dict]:
         one: list[dict] = []
-        for attempt in range(args.retries + 1):
-            one = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
-            if one:
-                break
-            time.sleep(1.0 + attempt)
-        if not one:
-            one = collect_with_duckduckgo(kw, args.per_keyword)
+        for eng in engine_order:
+            if eng == "google":
+                for attempt in range(args.retries + 1):
+                    one = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
+                    if one:
+                        break
+                    time.sleep(1.0 + attempt)
+                if one:
+                    return one
+            elif eng == "bing":
+                for attempt in range(args.retries + 1):
+                    one = collect_with_bing_playwright(kw, args.per_keyword, args.delay_ms)
+                    if one:
+                        break
+                    time.sleep(1.0 + attempt)
+                if one:
+                    return one
+            elif eng in {"duckduckgo", "ddg"}:
+                one = collect_with_duckduckgo(kw, args.per_keyword)
+                if one:
+                    return one
         return one
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.keyword_workers)) as ex:
