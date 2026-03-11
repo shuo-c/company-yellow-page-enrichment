@@ -99,7 +99,7 @@ def parse_args() -> Config:
     p.add_argument("--out-dir", default="out")
     p.add_argument("--batch-size", type=int, default=10)
     p.add_argument("--key-field", default="company_key")
-    p.add_argument("--fields", default="intro,description", help="comma-separated")
+    p.add_argument("--fields", default="lang_code,brief,description", help="comma-separated")
     a = p.parse_args()
     return Config(
         records_file=Path(a.records_file),

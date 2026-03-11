@@ -23,7 +23,9 @@ Execute an end-to-end translation pipeline for company profile fields, and fetch
 
 2. **translate**
    - Process pending batches.
-   - Translate only configured `FIELDS`.
+   - Default mode: expand from existing i18n source rows (`lang_code=en`) into target languages.
+   - Keep source `en` row and append translated rows (for example `zh-CN`, `es`) with updated `lang_code`.
+   - Translate only configured `FIELDS` (default `brief,description`).
    - Keep protected fields/patterns unchanged.
    - Write `batch_XXXX.translated.jsonl`.
 
@@ -75,7 +77,9 @@ Minimum expected keys:
 
 Common optional keys:
 - `BATCH_SIZE` (default `10`)
-- `FIELDS` (for example `intro,description`)
+- `FIELDS` (default `brief,description`; can include `lang_code` in split stage)
+- `SOURCE_LANG` (default `en`)
+- `TARGET_LANGS` (for example `zh-CN,es`)
 - `GLOSSARY_FILE`
 - `NO_TRANSLATE_FIELDS`
 - `RESUME` (default `true`)

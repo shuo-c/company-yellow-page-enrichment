@@ -69,10 +69,14 @@ def update_todo(todo_file: Path, status: str, error: str | None = None) -> None:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Translate one batch input file")
     p.add_argument("--batch-file", required=True, help="path to *.input.jsonl")
-    p.add_argument("--target-lang", required=True)
+    p.add_argument("--target-lang", help="single target lang (kept for backward compatibility)")
+    p.add_argument("--target-langs", default="", help="comma-separated target langs, e.g. zh-CN,es")
+    p.add_argument("--source-lang", default="en", help="only rows with this lang_code will be expanded")
+    p.add_argument("--lang-code-field", default="lang_code")
     p.add_argument("--engine", default="mock")
-    p.add_argument("--fields", default="intro,description", help="comma-separated")
+    p.add_argument("--fields", default="brief,description", help="comma-separated")
     p.add_argument("--no-translate-fields", default="company_name,address,website,url")
+    p.add_argument("--include-source", action="store_true", default=True, help="keep source rows in output")
     return p.parse_args()
 
 
@@ -84,19 +88,44 @@ def main() -> None:
     fields = [x.strip() for x in args.fields.split(",") if x.strip()]
     no_translate = {x.strip() for x in args.no_translate_fields.split(",") if x.strip()}
 
+    target_langs = [x.strip() for x in (args.target_langs or "").split(",") if x.strip()]
+    if not target_langs and args.target_lang:
+        target_langs = [args.target_lang.strip()]
+    if not target_langs:
+        raise ValueError("provide --target-lang or --target-langs")
+
     out_rows: list[dict] = []
     skipped = 0
     for row in rows:
-        out = dict(row)
-        for field in fields:
-            if field in no_translate:
+        row_lang = str(row.get(args.lang_code_field, "") or "").strip()
+
+        # Keep non-source rows untouched (already translated or from other langs)
+        if row_lang and row_lang != args.source_lang:
+            out_rows.append(dict(row))
+            continue
+
+        # Keep source row (default behavior for i18n expansion)
+        if args.include_source:
+            out_rows.append(dict(row))
+
+        # Expand source i18n row into each target language row
+        for target_lang in target_langs:
+            if target_lang == row_lang:
                 continue
-            value = row.get(field)
-            if should_skip_value(value):
-                skipped += 1
-                continue
-            out[field] = translate_text(str(value), args.target_lang, args.engine)
-        out_rows.append(out)
+
+            out = dict(row)
+            out[args.lang_code_field] = target_lang
+            out["source_lang_code"] = row_lang or args.source_lang
+
+            for field in fields:
+                if field in no_translate:
+                    continue
+                value = row.get(field)
+                if should_skip_value(value):
+                    skipped += 1
+                    continue
+                out[field] = translate_text(str(value), target_lang, args.engine)
+            out_rows.append(out)
 
     out_file = batch_file.with_name(batch_file.name.replace(".input.jsonl", ".translated.jsonl"))
     write_jsonl(out_file, out_rows)
@@ -112,6 +141,7 @@ def main() -> None:
     print(f"batch_file={batch_file}")
     print(f"translated_file={out_file}")
     print(f"rows={len(out_rows)}")
+    print(f"target_langs={','.join(target_langs)}")
     print(f"skipped_values={skipped}")
 
 
