@@ -14,6 +14,8 @@ Extract structured company records from search + official websites for yellow pa
    - Valid examples: `Sydney IT company`, `Melbourne accounting company`, `NSW Home Builder company`.
    - Keyword builder uses associative expansion (agent-like term association) and expands one seed to about 10 queries by default.
    - Formal parameter: `--expansion-count` (default 10; deprecated alias `--max-keywords`).
+   - Entity-term expansion is enabled by default: `company` will be associated with terms like `business/agency/firm/provider/consultancy/studio/solutions/services/experts`.
+   - Controls: `--expand-entity-terms` (default on), `--no-expand-entity-terms`, `--entity-terms`.
    - Reject keywords without `company`.
 
 2. **Collect candidate websites (Playwright + Google)**
@@ -89,6 +91,8 @@ Accepts combined forms like `Sydney NSW` or `Sydney, NSW`.
 - `expansion_count` (default 10)
 - `location_mode` (`fixed|city|state|mixed`, default `mixed`)
 - `mixed_city_ratio` (default `0.7`)
+- `expand_entity_terms` (default true)
+- `entity_terms` (comma-separated entity suffix dictionary)
 - `official_site_only`
 - `require_logo` (default true)
 - `require_intro` (default true)

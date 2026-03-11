@@ -16,6 +16,7 @@ RELATED = {
 }
 
 GENERIC_EXPANSIONS = ["services", "business", "provider", "contractor", "near me", "best"]
+ENTITY_TERMS_DEFAULT = ["company", "business", "agency", "firm", "provider", "consultancy", "studio", "solutions", "services", "experts"]
 
 AU_STATES = {
     "nsw", "new south wales", "vic", "victoria", "qld", "queensland", "wa", "western australia",
@@ -116,20 +117,46 @@ def associative_expansions(seed_topic: str, all_service_names: list[str], cap: i
     return out
 
 
-def build_keywords(location: str, seed_topic: str, expansion_count: int, locations: list[str], all_service_names: list[str]) -> list[str]:
+def build_keywords(
+    location: str,
+    seed_topic: str,
+    expansion_count: int,
+    locations: list[str],
+    all_service_names: list[str],
+    entity_terms: list[str],
+    expand_entity_terms: bool,
+) -> list[str]:
     expansions = associative_expansions(seed_topic, all_service_names, cap=max(20, expansion_count * 3))
 
-    base = [f"{location} {seed_topic} company"]
+    entity_terms = [x.strip() for x in entity_terms if x.strip()]
+    if not entity_terms:
+        entity_terms = ["company"]
+
+    base = []
+    if expand_entity_terms:
+        for et in entity_terms:
+            base.append(f"{location} {seed_topic} {et}")
+    else:
+        base.append(f"{location} {seed_topic} company")
+
     for loc in locations:
         for e in expansions:
-            base.append(f"{loc} {e} company")
+            if expand_entity_terms:
+                for et in entity_terms:
+                    base.append(f"{loc} {e} {et}")
+            else:
+                base.append(f"{loc} {e} company")
 
     uniq: list[str] = []
     seen = set()
     for k in base:
         lk = k.lower().strip()
-        if "company" not in lk:
-            continue
+        if expand_entity_terms:
+            if not any(lk.endswith(" " + et.lower()) for et in entity_terms):
+                continue
+        else:
+            if "company" not in lk:
+                continue
         if lk in seen:
             continue
         seen.add(lk)
@@ -148,6 +175,9 @@ def main() -> int:
     p.add_argument("--location-mode", choices=["fixed", "city", "state", "mixed"], default="mixed")
     p.add_argument("--mixed-city-ratio", type=float, default=0.7)
     p.add_argument("--random-seed", type=int, default=42)
+    p.add_argument("--expand-entity-terms", action="store_true", default=True, help="expand company synonyms (default: on)")
+    p.add_argument("--no-expand-entity-terms", dest="expand_entity_terms", action="store_false", help="disable company synonym expansion")
+    p.add_argument("--entity-terms", default=",".join(ENTITY_TERMS_DEFAULT), help="comma-separated entity terms for suffix expansion")
     p.add_argument("--out", required=True, help="Output JSON path")
     p.add_argument("--industry-csv", default=str((Path(__file__).resolve().parent.parent / "references" / "industries.csv")))
     p.add_argument("--service-csv", default=str((Path(__file__).resolve().parent.parent / "references" / "services.csv")))
@@ -164,7 +194,10 @@ def main() -> int:
     validate_seed_topic(args.seed_topic, industry_names, service_names)
 
     location_pool = pick_location_pool(args.location, args.location_mode, args.mixed_city_ratio)
-    kws = build_keywords(args.location, args.seed_topic, expansion_count, location_pool, all_services)
+    entity_terms = [x.strip() for x in args.entity_terms.split(",") if x.strip()]
+    kws = build_keywords(
+        args.location, args.seed_topic, expansion_count, location_pool, all_services, entity_terms, args.expand_entity_terms
+    )
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -176,6 +209,8 @@ def main() -> int:
                     "expansion_count": expansion_count,
                     "location_mode": args.location_mode,
                     "mixed_city_ratio": args.mixed_city_ratio,
+                    "expand_entity_terms": args.expand_entity_terms,
+                    "entity_terms": entity_terms,
                 },
             },
             ensure_ascii=False,
