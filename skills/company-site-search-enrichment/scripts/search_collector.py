@@ -358,8 +358,78 @@ def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) 
     return rows
 
 
+
+def collect_with_google_html(query: str, per_keyword: int) -> list[dict]:
+    # lightweight fallback parser for Google SERP HTML
+    url = f"https://www.google.com/search?q={urllib.parse.quote_plus(query)}&num={max(per_keyword, 10)}&hl=en"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        html = r.read().decode("utf-8", errors="replace")
+
+    # Prefer /url?q=... links from result blocks
+    links = re.findall(r'href="/url\?q=([^"&]+)[^"]*"', html, flags=re.I)
+    rows = []
+    seen = set()
+    rank = 0
+    for enc in links:
+        if rank >= per_keyword:
+            break
+        href = urllib.parse.unquote(enc)
+        d = domain(href)
+        if not href.startswith("http") or not d or d in seen:
+            continue
+        if d.endswith("google.com"):
+            continue
+        seen.add(d)
+        rank += 1
+        rows.append({
+            "rank": rank,
+            "title": "",
+            "url": href,
+            "description": "",
+            "source_search_keyword": query,
+            "domain": d,
+            "search_engine": "google",
+        })
+    return rows
+
+
+def collect_with_duckduckgo_lite(query: str, per_keyword: int) -> list[dict]:
+    url = f"https://lite.duckduckgo.com/lite/?q={urllib.parse.quote_plus(query)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        html = r.read().decode("utf-8", errors="replace")
+
+    # lite results are plain links in table rows; collect external links only
+    links = re.findall(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, flags=re.I | re.S)
+    rows = []
+    rank = 0
+    seen = set()
+    for href, title_html in links:
+        if rank >= per_keyword:
+            break
+        href = clean_duckduckgo_href(href.strip())
+        d = domain(href)
+        if not href.startswith("http") or not d or d in seen:
+            continue
+        if d.endswith("duckduckgo.com"):
+            continue
+        seen.add(d)
+        title = re.sub(r"<[^>]+>", "", title_html).strip()
+        rank += 1
+        rows.append({
+            "rank": rank,
+            "title": title,
+            "url": href,
+            "description": "",
+            "source_search_keyword": query,
+            "domain": d,
+            "search_engine": "duckduckgo",
+        })
+    return rows
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="Collect candidate company websites from Google via Playwright")
+    p = argparse.ArgumentParser(description="Collect candidate company websites from multi-engine search (Google/Bing/DDG)")
     p.add_argument("--keywords", required=True, help="keywords JSON from query_builder")
     p.add_argument("--out", required=True, help="output JSONL")
     p.add_argument("--per-keyword", type=int, default=10, help="results per keyword batch")
@@ -382,13 +452,23 @@ def main() -> int:
         for eng in engine_order:
             one: list[dict] = []
             if eng == "google":
+                dom_rows: list[dict] = []
+                html_rows: list[dict] = []
                 for attempt in range(args.retries + 1):
-                    one = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
-                    if one:
+                    dom_rows = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
+                    if dom_rows:
                         break
                     time.sleep(1.0 + attempt)
-                if one:
+                if not dom_rows:
+                    try:
+                        html_rows = collect_with_google_html(kw, args.per_keyword)
+                    except Exception:
+                        html_rows = []
+                one = merge_rows(dom_rows, html_rows, limit=args.per_keyword)
+                if len(one) >= max(1, args.min_results_per_keyword):
                     return one
+                if len(one) > len(best):
+                    best = one
 
             elif eng == "bing":
                 dom_rows: list[dict] = []
@@ -410,12 +490,22 @@ def main() -> int:
                     best = one
 
             elif eng in {"duckduckgo", "ddg"}:
-                one = collect_with_duckduckgo(kw, args.per_keyword)
-                if one:
-                    if len(one) >= max(1, args.min_results_per_keyword):
-                        return one
-                    if len(one) > len(best):
-                        best = one
+                html_rows: list[dict] = []
+                lite_rows: list[dict] = []
+                try:
+                    html_rows = collect_with_duckduckgo(kw, args.per_keyword)
+                except Exception:
+                    html_rows = []
+                if len(html_rows) < max(1, args.min_results_per_keyword):
+                    try:
+                        lite_rows = collect_with_duckduckgo_lite(kw, args.per_keyword)
+                    except Exception:
+                        lite_rows = []
+                one = merge_rows(html_rows, lite_rows, limit=args.per_keyword)
+                if len(one) >= max(1, args.min_results_per_keyword):
+                    return one
+                if len(one) > len(best):
+                    best = one
         return best
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.keyword_workers)) as ex:
