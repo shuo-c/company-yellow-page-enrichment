@@ -22,17 +22,17 @@ URL_RE = re.compile(r"^https?://\S+$", re.I)
 EMAIL_RE = re.compile(r"^[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}$")
 PHONE_RE = re.compile(r"^\+?\d[\d\-()\s]{6,}\d$")
 
-REGISTERED_ABN_PATTERNS = [
+REGISTERED_ID_PATTERNS = [
     re.compile(
-        r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+business\s+in\s+Australia\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
+        r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+business\s+in\s+Australia\s+with\s+(?P<id_type>ABN|ACN)\s*[:：]?\s*(?P<id_value>[0-9\s]{8,20})\.?\s*$",
         re.I,
     ),
     re.compile(
-        r"^\s*(?P<name>.+?)\s+is\s+registered\s+in\s+Australia\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
+        r"^\s*(?P<name>.+?)\s+is\s+registered\s+in\s+Australia\s+with\s+(?P<id_type>ABN|ACN)\s*[:：]?\s*(?P<id_value>[0-9\s]{8,20})\.?\s*$",
         re.I,
     ),
     re.compile(
-        r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+Australian\s+business\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
+        r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+Australian\s+business\s+with\s+(?P<id_type>ABN|ACN)\s*[:：]?\s*(?P<id_value>[0-9\s]{8,20})\.?\s*$",
         re.I,
     ),
 ]
@@ -79,14 +79,14 @@ def _normalize_lang(lang: str) -> str:
     return m.get(key, lang)
 
 
-def _template_translate(text: str, target_lang: str) -> str | None:
-    """Rule-based translation for common legal/registration boilerplate.
+def _template_translate(text: str, target_lang: str, engine: str = "mock") -> str | None:
+    """Rule-based translation for legal registration boilerplate (ABN/ACN).
 
-    Keep named entities/ids unchanged while translating connective wording.
+    Preserve company name + identifier value, translate only sentence frame.
     """
     m = None
     t0 = (text or "").strip()
-    for p in REGISTERED_ABN_PATTERNS:
+    for p in REGISTERED_ID_PATTERNS:
         m = p.match(t0)
         if m:
             break
@@ -94,15 +94,30 @@ def _template_translate(text: str, target_lang: str) -> str | None:
         return None
 
     name = (m.group("name") or "").strip()
-    abn = re.sub(r"\s+", "", (m.group("abn") or "").strip())
+    id_type = (m.group("id_type") or "").upper().strip() or "ABN"
+    id_value = re.sub(r"\s+", "", (m.group("id_value") or "").strip())
     t = _normalize_lang(target_lang).lower()
 
     if t.startswith("zh"):
-        return f"{name} 是在澳大利亚注册的企业，ABN：{abn}。"
+        return f"{name} 是在澳大利亚注册的企业，{id_type}：{id_value}。"
     if t == "es":
-        return f"{name} es una empresa registrada en Australia con ABN: {abn}."
+        return f"{name} es una empresa registrada en Australia con {id_type}: {id_value}."
 
-    return None
+    # Apply same special handling to other languages too: preserve tokens,
+    # translate the registration sentence frame with the selected engine.
+    frame_en = f"is a registered business in Australia with {id_type}:"
+    translated_frame = frame_en
+    if engine == "google":
+        try:
+            from deep_translator import GoogleTranslator
+
+            translated_frame = (
+                GoogleTranslator(source="en", target=_normalize_lang(target_lang)).translate(frame_en) or frame_en
+            )
+        except Exception:
+            translated_frame = frame_en
+
+    return f"{name} {translated_frame} {id_value}."
 
 
 def _split_text_for_translation(text: str, max_len: int = 3500) -> List[str]:
@@ -136,7 +151,7 @@ def _split_text_for_translation(text: str, max_len: int = 3500) -> List[str]:
 
 @lru_cache(maxsize=4096)
 def translate_text(text: str, target_lang: str, source_lang: str = "en", engine: str = "mock") -> str:
-    templated = _template_translate(text, target_lang)
+    templated = _template_translate(text, target_lang, engine=engine)
     if templated:
         return templated
 
