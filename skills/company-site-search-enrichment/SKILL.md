@@ -275,5 +275,6 @@ Required migration steps:
 Search engine resilience:
 - Bing uses dual-path collection: Playwright DOM + Bing RSS fallback, then merged/deduped.
 - Google uses Playwright DOM extraction with lightweight HTML fallback parser.
+- Google conservative mode is enabled by default (`--google-conservative`; disable via `--no-google-conservative`) to reduce burst/risk of challenge pages.
 - DuckDuckGo uses html endpoint with lite endpoint fallback, then merged/deduped.
 - If an engine returns fewer than `min_results_per_keyword` (default 3), collector tries next engine in `--engines` order.

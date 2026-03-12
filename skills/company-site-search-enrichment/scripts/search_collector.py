@@ -251,7 +251,7 @@ def collect_with_bing_rss(query: str, per_keyword: int) -> list[dict]:
         })
     return rows
 
-def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) -> list[dict]:
+def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500, conservative: bool = False) -> list[dict]:
     try:
         from playwright.sync_api import sync_playwright
     except Exception as e:
@@ -264,11 +264,23 @@ def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
+        if conservative:
+            try:
+                page.set_extra_http_headers({"Accept-Language": "en-AU,en;q=0.9"})
+            except Exception:
+                pass
         search_url = f"https://www.google.com/search?q={urllib.parse.quote_plus(query)}&num={max(per_keyword, 10)}&hl=en"
         page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(delay_ms)
+        page.wait_for_timeout(delay_ms + (800 if conservative else 0))
 
         try_accept_consent(page)
+        if conservative:
+            try:
+                page.mouse.wheel(0, 600)
+                page.wait_for_timeout(350)
+                page.mouse.wheel(0, -300)
+            except Exception:
+                pass
 
         selectors = [
             "a:has(h3)",
@@ -439,6 +451,8 @@ def main() -> int:
     p.add_argument("--target-candidates", type=int, default=0, help="stop once this many unique domains are collected (0 = no limit)")
     p.add_argument("--engines", default="google,bing", help="comma-separated search engines in priority order: google,bing,duckduckgo")
     p.add_argument("--min-results-per-keyword", type=int, default=3, help="minimum results expected per keyword before trying next engine")
+    p.add_argument("--google-conservative", action="store_true", default=True, help="enable conservative Google collection mode (default: on)")
+    p.add_argument("--no-google-conservative", dest="google_conservative", action="store_false", help="disable conservative Google mode")
     args = p.parse_args()
 
     kws = json.loads(Path(args.keywords).read_text(encoding="utf-8")).get("keywords", [])
@@ -449,8 +463,10 @@ def main() -> int:
 
     def collect_one_keyword(kw: str) -> list[dict]:
         best: list[dict] = []
-        for eng in engine_order:
+        for idx, eng in enumerate(engine_order):
             one: list[dict] = []
+            if idx > 0 and args.google_conservative:
+                time.sleep(0.4)
             if eng == "google":
                 dom_rows: list[dict] = []
                 html_rows: list[dict] = []
