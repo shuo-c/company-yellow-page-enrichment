@@ -44,6 +44,18 @@ Extract structured company records from search + official websites for yellow pa
    - Output CSV/JSON/database-ready rows.
    - Include run summary metrics and skip reasons.
 
+## Scheduled Task Defaults Form (Single Source of Truth)
+
+Use and maintain this file for cron/default run settings:
+
+- `references/scheduled_job_form.json`
+
+Required policy for scheduled runs:
+- Always read this form first before running scheduled enrichment.
+- `expansion_count` must default to **30** (attempt 30 keyword terms per run).
+- Output directory default is `/Users/derekchen/Desktop/qinxin/raw-data` unless overridden in the form.
+- If schedule/job defaults change, update this form first, then update cron payload.
+
 ## Industry/Service Taxonomy Filters (New)
 
 Use the following reference files as the authoritative filter lists:

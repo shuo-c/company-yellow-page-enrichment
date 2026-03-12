@@ -1,0 +1,16 @@
+{
+  "job_name": "company-enrichment-auto-run",
+  "timezone": "Australia/Sydney",
+  "schedule_cron": "0 9-23/2 * * *",
+  "output_dir": "/Users/derekchen/Desktop/qinxin/raw-data",
+  "engines": "google,bing,duckduckgo",
+  "min_results_per_keyword": 3,
+  "google_conservative": true,
+  "expansion_count": 30,
+  "location_mode": "mixed",
+  "mixed_city_ratio": 0.7,
+  "per_keyword": 5,
+  "target_candidates": 50,
+  "workers": 5,
+  "notes": "Scheduled defaults form. Keep this file updated and use it as the single source of truth for cron-run defaults."
+}
