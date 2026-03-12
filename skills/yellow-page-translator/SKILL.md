@@ -26,6 +26,7 @@ Execute an end-to-end translation pipeline for company profile fields, and fetch
    - Default mode: expand from existing i18n source rows (`lang_code=en`) into target languages.
    - Keep source `en` row and append translated rows (for example `zh-CN`, `es`) with updated `lang_code`.
    - Translate only configured `FIELDS` (default `brief,description`).
+   - Translation request mode defaults to one input per call (`TRANSLATE_INPUT_SIZE=1`).
    - Keep protected fields/patterns unchanged.
    - Write `batch_XXXX.translated.jsonl`.
 
@@ -80,6 +81,7 @@ Common optional keys:
 - `FIELDS` (default `brief,description`; can include `lang_code` in split stage)
 - `SOURCE_LANG` (default `en`)
 - `TARGET_LANGS` (for example `zh-CN,es`)
+- `TRANSLATE_INPUT_SIZE` (default `1`; translator sends one text item per request)
 - `GLOSSARY_FILE`
 - `NO_TRANSLATE_FIELDS`
 - `RESUME` (default `true`)

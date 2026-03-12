@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 from datetime import datetime, timezone
@@ -152,6 +153,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--fields", default="brief,description", help="comma-separated")
     p.add_argument("--no-translate-fields", default="company_name,address,website,url")
     p.add_argument("--include-source", action="store_true", default=True, help="keep source rows in output")
+    p.add_argument(
+        "--translate-input-size",
+        type=int,
+        default=int(os.getenv("TRANSLATE_INPUT_SIZE", "1")),
+        help="how many text items per translation request (default/env: TRANSLATE_INPUT_SIZE=1)",
+    )
     return p.parse_args()
 
 
@@ -162,6 +169,11 @@ def main() -> None:
 
     fields = [x.strip() for x in args.fields.split(",") if x.strip()]
     no_translate = {x.strip() for x in args.no_translate_fields.split(",") if x.strip()}
+
+    # Current translator implementation is intentionally one-item-per-request
+    # to keep quality stable and avoid provider-side batch failures.
+    if args.translate_input_size != 1:
+        raise ValueError("translate_input_size currently supports only 1; set TRANSLATE_INPUT_SIZE=1")
 
     target_langs = [x.strip() for x in (args.target_langs or "").split(",") if x.strip()]
     if not target_langs and args.target_lang:
@@ -222,6 +234,7 @@ def main() -> None:
     print(f"translated_file={out_file}")
     print(f"rows={len(out_rows)}")
     print(f"target_langs={','.join(target_langs)}")
+    print(f"translate_input_size={args.translate_input_size}")
     print(f"skipped_values={skipped}")
 
 
