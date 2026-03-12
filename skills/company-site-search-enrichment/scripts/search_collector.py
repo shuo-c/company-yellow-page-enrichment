@@ -51,6 +51,28 @@ def clean_duckduckgo_href(href: str) -> str:
     return href
 
 
+
+
+def merge_rows(*batches: list[dict], limit: int = 10) -> list[dict]:
+    out: list[dict] = []
+    seen = set()
+    rank = 0
+    for batch in batches:
+        for r in batch:
+            href = r.get("url", "")
+            d = r.get("domain", "")
+            k = href or d
+            if not k or k in seen:
+                continue
+            seen.add(k)
+            rank += 1
+            rr = dict(r)
+            rr["rank"] = rank
+            out.append(rr)
+            if len(out) >= limit:
+                return out
+    return out
+
 def try_accept_consent(page) -> None:
     candidates = [
         "I agree",
@@ -346,6 +368,7 @@ def main() -> int:
     p.add_argument("--keyword-workers", type=int, default=5, help="parallel keyword workers")
     p.add_argument("--target-candidates", type=int, default=0, help="stop once this many unique domains are collected (0 = no limit)")
     p.add_argument("--engines", default="google,bing", help="comma-separated search engines in priority order: google,bing,duckduckgo")
+    p.add_argument("--min-results-per-keyword", type=int, default=3, help="minimum results expected per keyword before trying next engine")
     args = p.parse_args()
 
     kws = json.loads(Path(args.keywords).read_text(encoding="utf-8")).get("keywords", [])
@@ -355,8 +378,9 @@ def main() -> int:
     engine_order = [e.strip().lower() for e in args.engines.split(",") if e.strip()]
 
     def collect_one_keyword(kw: str) -> list[dict]:
-        one: list[dict] = []
+        best: list[dict] = []
         for eng in engine_order:
+            one: list[dict] = []
             if eng == "google":
                 for attempt in range(args.retries + 1):
                     one = collect_with_playwright(kw, args.per_keyword, args.delay_ms)
@@ -365,24 +389,34 @@ def main() -> int:
                     time.sleep(1.0 + attempt)
                 if one:
                     return one
+
             elif eng == "bing":
+                dom_rows: list[dict] = []
+                rss_rows: list[dict] = []
                 for attempt in range(args.retries + 1):
-                    one = collect_with_bing_playwright(kw, args.per_keyword, args.delay_ms)
-                    if one:
+                    dom_rows = collect_with_bing_playwright(kw, args.per_keyword, args.delay_ms)
+                    if dom_rows:
                         break
                     time.sleep(1.0 + attempt)
-                if not one:
-                    try:
-                        one = collect_with_bing_rss(kw, args.per_keyword)
-                    except Exception:
-                        one = []
-                if one:
+                try:
+                    rss_rows = collect_with_bing_rss(kw, args.per_keyword)
+                except Exception:
+                    rss_rows = []
+
+                one = merge_rows(dom_rows, rss_rows, limit=args.per_keyword)
+                if len(one) >= max(1, args.min_results_per_keyword):
                     return one
+                if len(one) > len(best):
+                    best = one
+
             elif eng in {"duckduckgo", "ddg"}:
                 one = collect_with_duckduckgo(kw, args.per_keyword)
                 if one:
-                    return one
-        return one
+                    if len(one) >= max(1, args.min_results_per_keyword):
+                        return one
+                    if len(one) > len(best):
+                        best = one
+        return best
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.keyword_workers)) as ex:
         fut_to_kw = {ex.submit(collect_one_keyword, kw): kw for kw in kws}

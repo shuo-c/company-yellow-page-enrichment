@@ -237,7 +237,7 @@ python3 scripts/run_pipeline.py \
   --target-candidates 50 \
   --workers 5 \
   --name sydney_it_companies \
-  # optional: --engines google,bing,duckduckgo
+  # optional: --engines google,bing,duckduckgo --min-results-per-keyword 3
 ```
 
 Notes:
@@ -270,3 +270,8 @@ Required migration steps:
 2. Run `bash scripts/setup_playwright.sh`.
 3. Verify with a small test run (`--max-keywords 1 --per-keyword 3`).
 
+
+
+Search engine resilience:
+- Bing uses dual-path collection: Playwright DOM + Bing RSS fallback, then merged/deduped.
+- If an engine returns fewer than `min_results_per_keyword` (default 3), collector tries next engine in `--engines` order.
