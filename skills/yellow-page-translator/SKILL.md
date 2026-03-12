@@ -92,6 +92,7 @@ Common optional keys:
 
 - Never translate company names (for example `companies_i18n.name`).
 - Never translate identifier/code fields (for example `industry_id`, `company_id`, `lang_code`, legal identifiers).
+- For legal boilerplate sentences (for example "X is a registered business in Australia with ABN: ..."), translate the sentence frame but preserve entity/identifier tokens (company name + ABN) unchanged.
 - Never translate address-related fields (for example address/city/state/province/postcode/zip/country/street).
 - Never fabricate qualifications, awards, metrics, or business claims.
 - Preserve semantic equivalence; improve fluency only.

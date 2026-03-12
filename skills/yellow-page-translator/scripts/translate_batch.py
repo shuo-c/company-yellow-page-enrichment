@@ -22,6 +22,11 @@ URL_RE = re.compile(r"https?://\S+", re.I)
 EMAIL_RE = re.compile(r"\b[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}\b")
 PHONE_RE = re.compile(r"\+?\d[\d\-()\s]{6,}\d")
 
+REGISTERED_ABN_RE = re.compile(
+    r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+business\s+in\s+Australia\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
+    re.I,
+)
+
 
 def read_jsonl(path: Path) -> list[dict]:
     out = []
@@ -64,6 +69,27 @@ def _normalize_lang(lang: str) -> str:
     return m.get(key, lang)
 
 
+def _template_translate(text: str, target_lang: str) -> str | None:
+    """Rule-based translation for common legal/registration boilerplate.
+
+    Keep named entities/ids unchanged while translating connective wording.
+    """
+    m = REGISTERED_ABN_RE.match((text or "").strip())
+    if not m:
+        return None
+
+    name = (m.group("name") or "").strip()
+    abn = re.sub(r"\s+", "", (m.group("abn") or "").strip())
+    t = _normalize_lang(target_lang).lower()
+
+    if t.startswith("zh"):
+        return f"{name} 是在澳大利亚注册的企业，ABN：{abn}。"
+    if t == "es":
+        return f"{name} es una empresa registrada en Australia con ABN: {abn}."
+
+    return None
+
+
 def _split_text_for_translation(text: str, max_len: int = 3500) -> List[str]:
     t = (text or "").strip()
     if len(t) <= max_len:
@@ -95,6 +121,10 @@ def _split_text_for_translation(text: str, max_len: int = 3500) -> List[str]:
 
 @lru_cache(maxsize=4096)
 def translate_text(text: str, target_lang: str, source_lang: str = "en", engine: str = "mock") -> str:
+    templated = _template_translate(text, target_lang)
+    if templated:
+        return templated
+
     if engine == "mock":
         return f"[{target_lang}] {text}"
 
