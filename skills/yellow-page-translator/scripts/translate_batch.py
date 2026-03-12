@@ -22,10 +22,20 @@ URL_RE = re.compile(r"^https?://\S+$", re.I)
 EMAIL_RE = re.compile(r"^[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}$")
 PHONE_RE = re.compile(r"^\+?\d[\d\-()\s]{6,}\d$")
 
-REGISTERED_ABN_RE = re.compile(
-    r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+business\s+in\s+Australia\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
-    re.I,
-)
+REGISTERED_ABN_PATTERNS = [
+    re.compile(
+        r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+business\s+in\s+Australia\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
+        re.I,
+    ),
+    re.compile(
+        r"^\s*(?P<name>.+?)\s+is\s+registered\s+in\s+Australia\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
+        re.I,
+    ),
+    re.compile(
+        r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+Australian\s+business\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
+        re.I,
+    ),
+]
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -74,7 +84,12 @@ def _template_translate(text: str, target_lang: str) -> str | None:
 
     Keep named entities/ids unchanged while translating connective wording.
     """
-    m = REGISTERED_ABN_RE.match((text or "").strip())
+    m = None
+    t0 = (text or "").strip()
+    for p in REGISTERED_ABN_PATTERNS:
+        m = p.match(t0)
+        if m:
+            break
     if not m:
         return None
 
