@@ -18,9 +18,9 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from typing import List
 
-URL_RE = re.compile(r"https?://\S+", re.I)
-EMAIL_RE = re.compile(r"\b[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}\b")
-PHONE_RE = re.compile(r"\+?\d[\d\-()\s]{6,}\d")
+URL_RE = re.compile(r"^https?://\S+$", re.I)
+EMAIL_RE = re.compile(r"^[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}$")
+PHONE_RE = re.compile(r"^\+?\d[\d\-()\s]{6,}\d$")
 
 REGISTERED_ABN_RE = re.compile(
     r"^\s*(?P<name>.+?)\s+is\s+a\s+registered\s+business\s+in\s+Australia\s+with\s+ABN\s*[:：]?\s*(?P<abn>[0-9\s]{11,20})\.?\s*$",
@@ -51,7 +51,7 @@ def should_skip_value(value: object) -> bool:
     text = str(value).strip()
     if not text:
         return True
-    return bool(URL_RE.search(text) or EMAIL_RE.search(text) or PHONE_RE.search(text))
+    return bool(URL_RE.match(text) or EMAIL_RE.match(text) or PHONE_RE.match(text))
 
 
 def _normalize_lang(lang: str) -> str:
