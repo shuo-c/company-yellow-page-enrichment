@@ -120,37 +120,113 @@ def collect_with_bing_playwright(query: str, per_keyword: int, delay_ms: int = 1
         page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(delay_ms)
 
-        nodes = page.locator("li.b_algo h2 a")
-        count = nodes.count()
+        try:
+            page.wait_for_selector("#b_results, ol#b_results, li.b_algo", timeout=4000)
+        except Exception:
+            pass
+
+        try:
+            page.mouse.wheel(0, 1200)
+            page.wait_for_timeout(300)
+            page.mouse.wheel(0, -600)
+        except Exception:
+            pass
+
+        selectors = [
+            "#b_results li.b_algo h2 a",
+            "ol#b_results li.b_algo h2 a",
+            "li.b_algo h2 a",
+            "#b_results li.b_algo a",
+            "li.b_algo a",
+            "main a[href^='http']",
+        ]
+
         rank = 0
         seen_urls = set()
 
-        for i in range(count):
+        for sel in selectors:
+            try:
+                nodes = page.locator(sel)
+                count = nodes.count()
+                for i in range(count):
+                    if rank >= per_keyword:
+                        break
+                    a = nodes.nth(i)
+                    href = clean_bing_href(a.get_attribute("href") or "")
+                    if not href.startswith("http"):
+                        continue
+                    d = domain(href)
+                    if not d:
+                        continue
+                    if d.endswith("bing.com") or d.endswith("microsoft.com"):
+                        continue
+                    if href in seen_urls:
+                        continue
+                    seen_urls.add(href)
+                    title = (a.inner_text(timeout=1200) or "").strip()
+                    if not title:
+                        try:
+                            title = (a.text_content(timeout=1200) or "").strip()
+                        except Exception:
+                            title = ""
+                    rank += 1
+                    rows.append(
+                        {
+                            "rank": rank,
+                            "title": title,
+                            "url": href,
+                            "description": "",
+                            "source_search_keyword": query,
+                            "domain": d,
+                            "search_engine": "bing",
+                        }
+                    )
+            except Exception:
+                continue
+
             if rank >= per_keyword:
                 break
-            a = nodes.nth(i)
-            href = clean_bing_href(a.get_attribute("href") or "")
-            if not href.startswith("http"):
-                continue
-            d = domain(href)
-            if not d or href in seen_urls:
-                continue
-            seen_urls.add(href)
-            rank += 1
-            rows.append(
-                {
-                    "rank": rank,
-                    "title": (a.inner_text(timeout=1200) or "").strip(),
-                    "url": href,
-                    "description": "",
-                    "source_search_keyword": query,
-                    "domain": d,
-                    "search_engine": "bing",
-                }
-            )
 
         browser.close()
 
+    return rows
+
+
+
+
+def collect_with_bing_rss(query: str, per_keyword: int) -> list[dict]:
+    # lightweight fallback when Bing SERP DOM is blocked/changing
+    url = f"https://www.bing.com/search?format=rss&q={urllib.parse.quote_plus(query)}&count={max(per_keyword, 10)}&setlang=en"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        xml = r.read().decode("utf-8", errors="replace")
+
+    items = re.findall(r"<item>([\s\S]*?)</item>", xml, flags=re.I)
+    rows = []
+    rank = 0
+    seen = set()
+    for it in items:
+        if rank >= per_keyword:
+            break
+        m_title = re.search(r"<title>([\s\S]*?)</title>", it, flags=re.I)
+        m_link = re.search(r"<link>([\s\S]*?)</link>", it, flags=re.I)
+        if not m_link:
+            continue
+        href = (m_link.group(1) or "").strip()
+        d = domain(href)
+        if not href.startswith("http") or not d or d in seen:
+            continue
+        seen.add(d)
+        rank += 1
+        rows.append({
+            "rank": rank,
+            "title": (m_title.group(1).strip() if m_title else ""),
+            "url": href,
+            "description": "",
+            "source_search_keyword": query,
+            "domain": d,
+            "search_engine": "bing",
+        })
     return rows
 
 def collect_with_playwright(query: str, per_keyword: int, delay_ms: int = 1500) -> list[dict]:
@@ -295,6 +371,11 @@ def main() -> int:
                     if one:
                         break
                     time.sleep(1.0 + attempt)
+                if not one:
+                    try:
+                        one = collect_with_bing_rss(kw, args.per_keyword)
+                    except Exception:
+                        one = []
                 if one:
                     return one
             elif eng in {"duckduckgo", "ddg"}:
