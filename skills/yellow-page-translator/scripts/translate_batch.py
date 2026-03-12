@@ -14,6 +14,8 @@ import json
 import re
 from pathlib import Path
 from datetime import datetime, timezone
+from functools import lru_cache
+from typing import List
 
 URL_RE = re.compile(r"https?://\S+", re.I)
 EMAIL_RE = re.compile(r"\b[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}\b")
@@ -46,10 +48,83 @@ def should_skip_value(value: object) -> bool:
     return bool(URL_RE.search(text) or EMAIL_RE.search(text) or PHONE_RE.search(text))
 
 
-def translate_text(text: str, target_lang: str, engine: str = "mock") -> str:
+def _normalize_lang(lang: str) -> str:
+    m = {
+        "zh": "zh-CN",
+        "zh_cn": "zh-CN",
+        "zh-cn": "zh-CN",
+        "zh-tw": "zh-TW",
+        "es-es": "es",
+        "es-mx": "es",
+        "en-us": "en",
+        "en-gb": "en",
+    }
+    key = (lang or "").strip().lower()
+    return m.get(key, lang)
+
+
+def _split_text_for_translation(text: str, max_len: int = 3500) -> List[str]:
+    t = (text or "").strip()
+    if len(t) <= max_len:
+        return [t]
+
+    # sentence-ish split first
+    parts = re.split(r"(?<=[.!?。！？])\s+", t)
+    chunks: List[str] = []
+    cur = ""
+    for p in parts:
+        if not p:
+            continue
+        if len(cur) + len(p) + 1 <= max_len:
+            cur = f"{cur} {p}".strip()
+        else:
+            if cur:
+                chunks.append(cur)
+            if len(p) <= max_len:
+                cur = p
+            else:
+                # hard split very long segment
+                for i in range(0, len(p), max_len):
+                    chunks.append(p[i : i + max_len])
+                cur = ""
+    if cur:
+        chunks.append(cur)
+    return chunks or [t]
+
+
+@lru_cache(maxsize=4096)
+def translate_text(text: str, target_lang: str, source_lang: str = "en", engine: str = "mock") -> str:
     if engine == "mock":
         return f"[{target_lang}] {text}"
-    raise NotImplementedError("only --engine mock is implemented in scaffold")
+
+    if engine == "google":
+        try:
+            from deep_translator import GoogleTranslator
+        except Exception as e:
+            raise RuntimeError(
+                "engine=google requires deep-translator. install with: pip3 install deep-translator"
+            ) from e
+
+        src = _normalize_lang(source_lang)
+        tgt = _normalize_lang(target_lang)
+        translator = GoogleTranslator(source=src, target=tgt)
+
+        chunks = _split_text_for_translation(text)
+        out_chunks: List[str] = []
+        for c in chunks:
+            c = c.strip()
+            if not c:
+                continue
+            try:
+                tr = translator.translate(c)
+                if not tr:
+                    tr = c
+            except Exception:
+                tr = c
+            out_chunks.append(tr)
+        return "\n".join(out_chunks).strip()
+
+    raise NotImplementedError("supported engines: mock, google")
 
 
 def update_todo(todo_file: Path, status: str, error: str | None = None) -> None:
@@ -124,7 +199,12 @@ def main() -> None:
                 if should_skip_value(value):
                     skipped += 1
                     continue
-                out[field] = translate_text(str(value), target_lang, args.engine)
+                out[field] = translate_text(
+                    str(value),
+                    target_lang,
+                    source_lang=(row_lang or args.source_lang),
+                    engine=args.engine,
+                )
             out_rows.append(out)
 
     out_file = batch_file.with_name(batch_file.name.replace(".input.jsonl", ".translated.jsonl"))
